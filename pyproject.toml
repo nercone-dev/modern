@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "nercone-modern"
 version = "1.0.0"
-description = "Nercone Modern is a simple package for logging and progress bar and More!"
+description = "Modern Logging and Progress Bar Library"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
     { name = "Nercone", email = "nercone@diamondgotcat.net" }
