@@ -11,7 +11,7 @@ class Downloader:
         self.total_downloaded = 0
         self.progress_bar = NerconeModern().modernProgressBar(
             total=0,
-            process_name="Downloading",
+            process_name="Downloader",
             process_color=32
         )
         self.start_time = time.time()
