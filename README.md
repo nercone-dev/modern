@@ -1,3 +1,6 @@
+
+<img width="692" alt="nercone-modern" src="https://github.com/user-attachments/assets/70972b15-eb17-4ae6-981b-c812940b67e5" />
+
 # nercone-modern
 Modern Logging and Progress Bar Library
 
