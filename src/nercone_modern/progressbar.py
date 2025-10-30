@@ -73,7 +73,7 @@ class ModernProgressBar:
         self._render(final=True, advance_spinner=False)
 
     def makeModernLogging(self, process_name):
-        from .ModernLogging import ModernLogging
+        from .logging import ModernLogging
         return ModernLogging(process_name)
 
     def logging(self, message, level="INFO", modernLogging=None):
@@ -194,16 +194,3 @@ class ModernProgressBar:
 
     def _color_by_code(self, color_code):
         return f"\033[{color_code}m"
-    
-if __name__ == "__main__":
-    progress_bar = ModernProgressBar(1000, "Example Task", 31)
-    progress_bar.start()
-    progress_bar.busy()
-    for i in range(100):
-        progress_bar.update()
-        time.sleep(0.1)
-    progress_bar.notbusy()
-    for i in range(1000):
-        progress_bar.update()
-        time.sleep(0.1)
-    progress_bar.finish()
