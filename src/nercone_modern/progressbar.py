@@ -132,7 +132,7 @@ class ModernProgressBar:
                 status = "(RUNN)"
             else:
                 status = f"({self.current:>{total_width}}/{self.total})"
-            line = f"({self._color('reset')}{bar}{self._color('reset')}) {self.process_name} - {'....' if self.spinner_mode else percentage} {status} | {self.message}"
+            line = f"({self._color('gray')}{bar}{self._color('reset')}) {self.process_name} - {'....' if self.spinner_mode else percentage} {status} | {self.message}"
             total_move_up = self.log_lines + (len(ModernProgressBar._active_bars) - self.index)
             if total_move_up > 0:
                 sys.stdout.write(f"\033[{total_move_up}A")
@@ -160,7 +160,7 @@ class ModernProgressBar:
                 filled_length = int(progress * bar_length) + 1
             else:
                 filled_length = int(progress * bar_length)
-            return f"{self._color('blue')}{filled_bar * filled_length}{self._color('cyan')}{center_bar}{self._color('black')}{empty_bar * (bar_length - filled_length)}"
+            return f"{self._color('blue')}{filled_bar * filled_length}{self._color('cyan')}{center_bar}{self._color('gray')}{empty_bar * (bar_length - filled_length)}"
         else:
             if self.current <= 0 and not self._spinner_ready:
                 return f"{self._color('gray')}{'-' * (bar_length + 1)}"
@@ -169,7 +169,7 @@ class ModernProgressBar:
             spinner_start_bar_length = bar_length - spinner_end_bar_length
             if advance_spinner:
                 self.spinner_step = (self.spinner_step + 1) % (bar_length + 1)
-            return f"{self._color('black')}{'-' * spinner_start_bar_length}{self._color('blue')}{'-' * spinner_symbol_length}{self._color('black')}{'-' * spinner_end_bar_length}"
+            return f"{self._color('gray')}{'-' * spinner_start_bar_length}{self._color('blue')}{'-' * spinner_symbol_length}{self._color('black')}{'-' * spinner_end_bar_length}"
 
     def _should_spin(self):
         return self.spinner_mode and self._spinner_ready
