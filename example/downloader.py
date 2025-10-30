@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+
+# -- nercone-modern --------------------------------------------- #
+# downloader.py on nercone-modern                                 #
+# Made by DiamondGotCat, Licensed under MIT License               #
+# Copyright (c) 2025 DiamondGotCat                                #
+# ---------------------------------------------- DiamondGotCat -- #
+
 import argparse
 import requests
 import os
