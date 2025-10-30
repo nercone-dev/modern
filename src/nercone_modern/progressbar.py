@@ -169,7 +169,7 @@ class ModernProgressBar:
             spinner_start_bar_length = bar_length - spinner_end_bar_length
             if advance_spinner:
                 self.spinner_step = (self.spinner_step + 1) % (bar_length + 1)
-            return f"{self._color('gray')}{'-' * spinner_start_bar_length}{self._color('blue')}{'-' * spinner_symbol_length}{self._color('black')}{'-' * spinner_end_bar_length}"
+            return f"{self._color('gray')}{'-' * spinner_start_bar_length}{self._color('blue')}{'-' * spinner_symbol_length}{self._color('gray')}{'-' * spinner_end_bar_length}"
 
     def _should_spin(self):
         return self.spinner_mode and self._spinner_ready
