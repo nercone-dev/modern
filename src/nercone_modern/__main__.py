@@ -1,18 +1,33 @@
-from nercone_modern import NerconeModern
+#!/usr/bin/env python3
 
-if __name__ == "__main__":
-    import time
+# -- nercone-modern --------------------------------------------- #
+# __main__.py on nercone-modern                                   #
+# Made by DiamondGotCat, Licensed under MIT License               #
+# Copyright (c) 2025 DiamondGotCat                                #
+# ---------------------------------------------- DiamondGotCat -- #
 
-    logger = NerconeModern().modernLogging("Main")
-    logger.log("This is a debug message", "DEBUG")
-    logger.log("This is a test message", "INFO")
-    logger.log("This is a warning message", "WARNING")
-    logger.log("This is an error message", "ERROR")
-    logger.log("This is an error message", "CRITICAL")
+import time
+from nercone_modern.logging import ModernLogging
+from nercone_modern.progressbar import ModernProgressBar
 
-    progress_bar1 = NerconeModern().modernProgressBar(total=100, process_name="Task 1", process_color=32, spinner_mode=False)
+logger1 = ModernLogging("Main", display_level="DEBUG")
+logger2 = ModernLogging("Sub", display_level="DEBUG")
+
+try:
+    logger1.log("This is a debug message", "DEBUG")
+    logger1.log("This is a info message", "INFO")
+    logger1.log("This is a info message", "INFO")
+    logger1.log("This is a info message", "INFO")
+    logger2.log("This is an error message", "INFO")
+    logger1.log("This is a warning message", "WARNING")
+    logger1.log("This is an error message", "ERROR")
+    logger1.log("This is an critical error message", "CRITICAL")
+    prompt_result = logger1.prompt("This is an Prompt. Let's try it: ")
+    logger1.log(f"Answer is: {prompt_result}", "INFO")
+
+    progress_bar1 = ModernProgressBar(total=100, process_name="Task 1", spinner_mode=False)
     progress_bar1.setMessage("WAITING")
-    progress_bar2 = NerconeModern().modernProgressBar(total=200, process_name="Task 2", process_color=34, spinner_mode=True)
+    progress_bar2 = ModernProgressBar(total=200, process_name="Task 2", spinner_mode=True)
     progress_bar2.setMessage("WAITING")
 
     progress_bar1.start()
@@ -32,3 +47,6 @@ if __name__ == "__main__":
         progress_bar2.update(2)
     progress_bar2.setMessage("DONE")
     progress_bar2.finish()
+except KeyboardInterrupt:
+    print()
+    logger1.log("Aborted.", "INFO")

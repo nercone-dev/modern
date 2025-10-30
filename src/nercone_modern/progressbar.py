@@ -1,18 +1,24 @@
+#!/usr/bin/env python3
+
+# -- nercone-modern --------------------------------------------- #
+# progressbar.py on nercone-modern                                #
+# Made by DiamondGotCat, Licensed under MIT License               #
+# Copyright (c) 2025 DiamondGotCat                                #
+# ---------------------------------------------- DiamondGotCat -- #
+
 import sys
 import threading
-import time
 
 class ModernProgressBar:
     _active_bars = []
     _last_rendered = False
     _lock = threading.RLock()
 
-    def __init__(self, total, process_name, process_color, spinner_mode=True):
+    def __init__(self, total: int, process_name: str, spinner_mode=True):
         self.total = total
         self.spinner_mode = spinner_mode
         self.current = 0
         self.process_name = process_name.strip()
-        self.process_color = process_color
         self.index = len(ModernProgressBar._active_bars)
         ModernProgressBar._active_bars.append(self)
         self.log_lines = 0
@@ -81,7 +87,7 @@ class ModernProgressBar:
             self.log_lines = 0
             if modernLogging is None:
                 modernLogging = self.makeModernLogging(self.process_name)
-            result = modernLogging._make(message, level, self.process_color)
+            result = modernLogging._make(message, level)
             if self.log_lines > 0:
                 move_up = self.log_lines
             else:
@@ -126,7 +132,7 @@ class ModernProgressBar:
                 status = "(RUNN)"
             else:
                 status = f"({self.current:>{total_width}}/{self.total})"
-            line = f"({self._color(self.process_color)}{bar}{self._color('reset')}) {self.process_name} - {'....' if self.spinner_mode else percentage} {status} | {self.message}"
+            line = f"({self._color('reset')}{bar}{self._color('reset')}) {self.process_name} - {'....' if self.spinner_mode else percentage} {status} | {self.message}"
             total_move_up = self.log_lines + (len(ModernProgressBar._active_bars) - self.index)
             if total_move_up > 0:
                 sys.stdout.write(f"\033[{total_move_up}A")
