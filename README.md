@@ -24,14 +24,14 @@ pip3 install nercone-modern
 
 ## Usage
 
-**Import**
+### Import
 
 ```python
 from nercone_modern.logging import ModernLogging
 from nercone_modern.progressbar import ModernProgressBar
 ```
 
-**Logging**
+### Logging
 
 ```python
 logger = ModernLogging("Main", display_level="DEBUG")
@@ -40,7 +40,14 @@ answer = logger.prompt("What's your name?", level="INFO")
 logger.log(f"Answer: {answer}", level="DEBUG")
 ```
 
-**Progress Bar**
+**Supported levels:**
+- `DEBUG`
+- `INFO`
+- `WARN`
+- `ERROR`
+- `CRITICAL`
+
+### Progress Bar
 
 ```python
 progress_bar = ModernProgressBar(total=100, process_name="Task 1", spinner_mode=True)
