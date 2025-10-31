@@ -14,7 +14,7 @@ class ModernProgressBar:
     _last_rendered = False
     _lock = threading.RLock()
 
-    def __init__(self, total: int, process_name: str, spinner_mode=True):
+    def __init__(self, total: int, process_name: str, spinner_mode=False):
         self.total = total
         self.spinner_mode = spinner_mode
         self.current = 0
@@ -55,7 +55,7 @@ class ModernProgressBar:
         self._start_spinner_thread_if_needed()
         self._render(advance_spinner=False)
 
-    def setMessage(self, message):
+    def setMessage(self, message: str = ""):
         self.message = message
 
     def start(self):
@@ -78,11 +78,13 @@ class ModernProgressBar:
         self._stop_spinner_thread()
         self._render(final=True, advance_spinner=False)
 
-    def makeModernLogging(self, process_name):
+    def makeModernLogging(self, process_name: str = None):
         from .logging import ModernLogging
+        if not process_name:
+            process_name = self.process_name
         return ModernLogging(process_name)
 
-    def logging(self, message, level="INFO", modernLogging=None):
+    def logging(self, message: str = "", level: str = "INFO", modernLogging=None):
         with ModernProgressBar._lock:
             self.log_lines = 0
             if modernLogging is None:
@@ -119,7 +121,7 @@ class ModernProgressBar:
                 continue
             self._render()
 
-    def _render(self, final=False, advance_spinner=True):
+    def _render(self, final: bool = False, advance_spinner: bool = True):
         with ModernProgressBar._lock:
             progress = self.current / self.total if self.total else 0
             bar = self._progress_bar(progress, advance_spinner=advance_spinner and self._should_spin())
@@ -145,7 +147,7 @@ class ModernProgressBar:
                 sys.stdout.write(f"\033[{down_lines}B")
             sys.stdout.flush()
 
-    def _progress_bar(self, progress, advance_spinner=True):
+    def _progress_bar(self, progress: int, advance_spinner: bool = True):
         bar_length = 20
         if not self._should_spin():
             empty_bar = "-"
@@ -174,7 +176,7 @@ class ModernProgressBar:
     def _should_spin(self):
         return self.spinner_mode and self._spinner_ready
 
-    def _color(self, color_name):
+    def _color(self, color_name: str = "reset"):
         if color_name == "cyan":
             return self._color_by_code(36)
         elif color_name == "magenta":
@@ -198,5 +200,5 @@ class ModernProgressBar:
         else:
             return ""
 
-    def _color_by_code(self, color_code):
+    def _color_by_code(self, color_code: int | str = 0):
         return f"\033[{color_code}m"

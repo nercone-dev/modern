@@ -24,19 +24,23 @@ pip3 install nercone-modern
 
 ## Usage
 
+**Import**
+
 ```python
 from nercone_modern.logging import ModernLogging
 from nercone_modern.progressbar import ModernProgressBar
 ```
 
-### Logging
+**Logging**
 
 ```python
 logger = ModernLogging("Main", display_level="DEBUG")
 logger.log("This is a test message", level="INFO")
+answer = logger.prompt("What's your name?", level="INFO")
+logger.log(f"Answer: {answer}", level="DEBUG")
 ```
 
-### Progress Bar
+**Progress Bar**
 
 ```python
 progress_bar = ModernProgressBar(total=100, process_name="Task 1", spinner_mode=True)
@@ -46,9 +50,23 @@ time.sleep(5)
 
 progress_bar.spinner(False)
 
-for i in range(100):
+progress_bar.setMessage("Step 1")
+
+for i in range(50):
   time.sleep(0.05)
-  progress_bar.update()
+  progress_bar.update(amount=1)
+
+progress_bar.setMessage("Step 2")
+
+for i in range(25):
+  time.sleep(0.03)
+  progress_bar.update(amount=1)
+
+progress_bar.setMessage("Step 3")
+
+for i in range(5):
+  time.sleep(1)
+  progress_bar.update(amount=5)
 
 progress_bar.finish()
 ```

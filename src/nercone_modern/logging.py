@@ -47,7 +47,7 @@ class ModernLogging:
         global _max_proc_width
         _max_proc_width = max(_max_proc_width, len(process_name))
 
-    def log(self, message="", level="INFO"):
+    def log(self, message: str = "", level: str = "INFO"):
         if not is_higher_priority(level, self.display_level):
             return
 
@@ -74,7 +74,7 @@ class ModernLogging:
         _last_process = self.process_name
         _last_level = level_text
 
-    def prompt(self, message="", level="INFO") -> str:
+    def prompt(self, message: str = "", level: str = "INFO") -> str:
         if not is_higher_priority(level, self.display_level):
             return
 
@@ -102,7 +102,7 @@ class ModernLogging:
         _last_level = level_text
         return input()
 
-    def _make(self, message, level_text, color, show_proc, show_level):
+    def _make(self, message: str, level_text: str, color: str, show_proc: bool, show_level: bool):
         global _max_proc_width
         level_width = max(MAX_LOG_LEVEL_WIDTH, len(level_text))
 
@@ -116,7 +116,7 @@ class ModernLogging:
 
         return f"{proc_part} {level_part} {str(message)}"
 
-    def _color(self, color_name):
+    def _color(self, color_name: str = "reset"):
         if color_name == "cyan":
             return self._color_by_code(36)
         elif color_name == "magenta":
@@ -140,5 +140,5 @@ class ModernLogging:
         else:
             return ""
 
-    def _color_by_code(self, color_code):
+    def _color_by_code(self, color_code: int | str = 0):
         return f"\033[{color_code}m"
