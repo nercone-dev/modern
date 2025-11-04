@@ -1,11 +1,14 @@
+from typing import Union
 from .color import ModernColor
 
 class ModernText:
     def __init__(self, content="", color: str = ModernColor.WHITE):
         self.content = content
+        if not color.startswith("\033"):
+            color = getattr(ModernColor, color.upper(), ModernColor.WHITE)
         self.color = color
 
-    def __add__(self, other: str | "ModernText"):
+    def __add__(self, other: Union[str, "ModernText"]):
         if isinstance(other, ModernText):
             if self.color == other.color:
                 return ModernText(self.content + other.content, self.color)

@@ -55,7 +55,7 @@ print(f"Build {Color.GREEN}Success{Color.RESET}")
 ```python
 from nercone_modern.text import ModernText as Text
 from nercone_modern.color import ModernColor as Color
-print("Build" + Text("Success", color=Color.GREEN))
+print("Build" + Text("Success", color="green"))
 print("Build" + Text("Failed", color=Color.RED))
 ```
 
