@@ -2,7 +2,7 @@
 <img width="1920" alt="Nercone Modern" src="https://github.com/user-attachments/assets/c92b0407-916f-46ec-9116-c3388b38c88c" />
 
 # nercone-modern
-Modern Logging and Progress Bar Library
+Modern CLI Library
 
 ## Installation
 
@@ -27,13 +27,41 @@ pip3 install nercone-modern
 ### Import
 
 ```python
+from nercone_modern.color import ModernColor
+from nercone_modern.text import ModernText
 from nercone_modern.logging import ModernLogging
 from nercone_modern.progressbar import ModernProgressBar
 ```
 
-### Logging
-
+### Color
 ```python
+from nercone_modern.color import ModernColor as Color
+print(f"Build {Color.GREEN}Success{Color.RESET}")
+```
+
+**Supported colors:**
+- `CYAN`
+- `MAGENTA`
+- `YELLOW`
+- `GREEN`
+- `RED`
+- `BLUE`
+- `WHITE`
+- `BLACK`
+- `GRAY`
+- `RESET`
+
+### Text
+```python
+from nercone_modern.text import ModernText as Text
+from nercone_modern.color import ModernColor as Color
+print("Build" + Text("Success", color=Color.GREEN))
+print("Build" + Text("Failed", color=Color.RED))
+```
+
+### Logging
+```python
+from nercone_modern.logging import ModernLogging
 logger = ModernLogging("Main", display_level="DEBUG")
 logger.log("This is a test message", level="INFO")
 answer = logger.prompt("What's your name?", level="INFO")
@@ -48,11 +76,11 @@ logger.log(f"Answer: {answer}", level="DEBUG")
 - `CRITICAL`
 
 ### Progress Bar
-
 ```python
+from nercone_modern.progressbar import ModernProgressBar
 progress_bar = ModernProgressBar(total=100, process_name="Task 1", spinner_mode=True)
-progress_bar.start()
 
+progress_bar.start()
 time.sleep(5)
 
 progress_bar.spinner(False)
