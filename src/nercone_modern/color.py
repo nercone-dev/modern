@@ -1,4 +1,9 @@
 class ModernColor:
+    @staticmethod
+    def ansi_color_by_code(color_code: int | str = 0):
+        return f"\033[{color_code}m"
+
+    @staticmethod
     def ansi_color(self, color_name: str = "reset"):
         if color_name == "cyan":
             return self.ansi_color_by_code(36)
@@ -23,16 +28,13 @@ class ModernColor:
         else:
             return ""
 
-    def ansi_color_by_code(self, color_code: int | str = 0):
-        return f"\033[{color_code}m"
-
-    CYAN = ansi_color("cyan")
-    MAGENTA = ansi_color("magenta")
-    YELLOW = ansi_color("yellow")
-    GREEN = ansi_color("green")
-    RED = ansi_color("red")
-    BLUE = ansi_color("blue")
-    WHITE = ansi_color("white")
-    BLACK = ansi_color("black")
-    GRAY = ansi_color("gray")
-    RESET = ansi_color("reset")
+ModernColor.CYAN = ModernColor.ansi_color("cyan")
+ModernColor.MAGENTA = ModernColor.ansi_color("magenta")
+ModernColor.YELLOW = ModernColor.ansi_color("yellow")
+ModernColor.GREEN = ModernColor.ansi_color("green")
+ModernColor.RED = ModernColor.ansi_color("red")
+ModernColor.BLUE = ModernColor.ansi_color("blue")
+ModernColor.WHITE = ModernColor.ansi_color("white")
+ModernColor.BLACK = ModernColor.ansi_color("black")
+ModernColor.GRAY = ModernColor.ansi_color("gray")
+ModernColor.RESET = ModernColor.ansi_color("reset")
