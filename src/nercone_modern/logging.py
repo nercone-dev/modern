@@ -59,10 +59,16 @@ class ModernLogging:
             with open(self.filepath, "a") as f:
                 f.write(f"{log_line}\n")
 
-    def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, ignore_kbdinterrupt: bool = True) -> str:
+    def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, ignore_kbdinterrupt: bool = True, default: str | None = None, choices: list[str] | None = None, show_choices: bool = True) -> str:
         if not is_higher_priority(level_text, self.display_level):
             return
         global _last_process, _last_level
+        if default:
+            message += f" ({default})"
+        if choices and show_choices:
+            message += f" [{'/'.join(choices)}]"
+        if not message.endswith(" "):
+            message += " "
         log_line = self.make(message=message, level_text=level_text, level_color=level_color)
         print(log_line, end="")
         _last_process = self.process_name
@@ -75,10 +81,62 @@ class ModernLogging:
                 print()
             else:
                 raise
+        if answer.strip() == "" and default is not None:
+            if choices:
+                selected_default = self._select_choice(default, choices)
+                if selected_default is not None:
+                    answer = default
+            else:
+                answer = default
         if self.filepath:
             with open(self.filepath, "a") as f:
                 f.write(f"{log_line}{answer}\n")
-        return answer
+        if choices:
+            selected = self._select_choice(answer, choices)
+            if selected is not None:
+                return selected
+            else:
+                while True:
+                    log_line = self.make(message=f"Invalid selection. Please select from: {'/'.join(choices)}", level_text=level_text, level_color=level_color)
+                    print(log_line, end="")
+                    if self.filepath:
+                        with open(self.filepath, "a") as f:
+                            f.write(f"{log_line}{answer}\n")
+                    log_line = self.make(message=message, level_text=level_text, level_color=level_color)
+                    print(log_line, end="")
+                    try:
+                        answer = input()
+                    except KeyboardInterrupt:
+                        if ignore_kbdinterrupt:
+                            print()
+                        else:
+                            raise
+                    if self.filepath:
+                        with open(self.filepath, "a") as f:
+                            f.write(f"{log_line}{answer}\n")
+                    if answer.strip() == "" and default is not None:
+                        if choices:
+                            selected_default = self._select_choice(default, choices)
+                            if selected_default is not None:
+                                return default
+                        else:
+                            return default
+                    selected = self._select_choice(answer, choices)
+                    if selected is not None:
+                        return selected
+
+    def _select_choice(self, answer: str, choices: list[str]) -> str | None:
+        if answer in choices:
+            return answer
+        stripped = answer.strip()
+        if stripped in choices:
+            return stripped
+        lower_map = {c.lower(): c for c in choices}
+        if answer.lower() in lower_map:
+            return lower_map[answer.lower()]
+        if stripped.lower() in lower_map:
+            return lower_map[stripped.lower()]
+        return None
 
     def make(self, message: str = "", level_text: str = "INFO", level_color: str | None = None):
         level_text = normalize_level(level_text.strip().upper())

@@ -22,8 +22,11 @@ try:
     logger1.log("This is a warning message", "WARNING")
     logger1.log("This is a error message", "ERROR")
     logger1.log("This is a critical error message", "CRITICAL")
-    prompt_result = logger1.prompt("This is a Prompt. Let's try it: ")
+    prompt_result = logger1.prompt("Continue demo?", choices=["Y", "n"])
     logger1.log(f"Answer is: {prompt_result}", "INFO")
+    if prompt_result == "n":
+        print("Exiting demo. See you!")
+        raise SystemExit(0)
 
     progress_bar1 = ModernProgressBar(total=100, process_name="Task 1", spinner_mode=False)
     progress_bar1.setMessage("WAITING")
