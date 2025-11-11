@@ -63,9 +63,11 @@ print("Build" + Text("Failed", color=Color.RED))
 ```python
 from nercone_modern.logging import ModernLogging
 logger = ModernLogging("Main", display_level="DEBUG")
-logger.log("This is a test message", level="INFO")
-answer = logger.prompt("What's your name?", level="INFO")
-logger.log(f"Answer: {answer}", level="DEBUG")
+logger.log("This is a test message", level_text="INFO", level_color="magenta")
+answer = logger.prompt("What's your name?", level_text="INFO")
+logger.log(f"Answer: {answer}", level_text="DEBUG")
+answer2 = logger.prompt("Select mode", default="A", choices=["A", "b", "c", "d"], level_text="INFO")
+logger.log(f"Mode: {answer2}", level_text="DEBUG")
 ```
 
 **Supported levels:**
