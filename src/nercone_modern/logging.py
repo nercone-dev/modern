@@ -59,11 +59,11 @@ class ModernLogging:
             with open(self.filepath, "a") as f:
                 f.write(f"{log_line}\n")
 
-    def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, ignore_kbdinterrupt: bool = True, default: str | None = None, choices: list[str] | None = None, show_choices: bool = True) -> str:
+    def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, ignore_kbdinterrupt: bool = True, default: str | None = None, show_default: bool = False, choices: list[str] | None = None, show_choices: bool = True) -> str:
         if not is_higher_priority(level_text, self.display_level):
             return
         global _last_process, _last_level
-        if default:
+        if default and show_default:
             message += f" ({default})"
         if choices and show_choices:
             message += f" [{'/'.join(choices)}]"
@@ -98,7 +98,7 @@ class ModernLogging:
             else:
                 while True:
                     log_line = self.make(message=f"Invalid selection. Please select from: {'/'.join(choices)}", level_text=level_text, level_color=level_color)
-                    print(log_line, end="")
+                    print(log_line)
                     if self.filepath:
                         with open(self.filepath, "a") as f:
                             f.write(f"{log_line}{answer}\n")

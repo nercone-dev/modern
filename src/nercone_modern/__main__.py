@@ -22,7 +22,7 @@ try:
     logger1.log("This is a warning message", "WARNING")
     logger1.log("This is a error message", "ERROR")
     logger1.log("This is a critical error message", "CRITICAL")
-    prompt_result = logger1.prompt("Continue demo?", choices=["Y", "n"])
+    prompt_result = logger1.prompt("Continue demo?", default="Y", choices=["Y", "n"])
     logger1.log(f"Answer is: {prompt_result}", "INFO")
     if prompt_result == "n":
         print("Exiting demo. See you!")
