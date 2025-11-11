@@ -124,6 +124,7 @@ class ModernLogging:
                     selected = self._select_choice(answer, choices)
                     if selected is not None:
                         return selected
+        return answer
 
     def _select_choice(self, answer: str, choices: list[str]) -> str | None:
         if answer in choices:
