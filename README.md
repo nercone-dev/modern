@@ -1,5 +1,5 @@
 
-<img width="1920" alt="nercone_modern" src="https://github.com/user-attachments/assets/4b2310e7-8020-43b6-9400-43103b4dba9a" />
+<img width="1920" alt="nercone_modern" src="https://github.com/user-attachments/assets/2558de60-cfc6-45e9-9365-ff09ba16185f" />
 
 # nercone-modern
 Modern CLI Library
