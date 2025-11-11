@@ -40,69 +40,68 @@ def is_higher_priority(level_a: str, level_b: str) -> bool:
         raise ValueError(f"Unknown log level: {level_a} or {level_b}")
 
 class ModernLogging:
-    def __init__(self, process_name: str, display_level: str = "INFO"):
+    def __init__(self, process_name: str = "App", display_level: str = "INFO", filepath: str | None = None):
         self.process_name = process_name
         self.display_level = display_level
-
+        self.filepath = filepath
         global _max_proc_width
         _max_proc_width = max(_max_proc_width, len(process_name))
 
-    def log(self, message: str = "", level: str = "INFO"):
-        if not is_higher_priority(level, self.display_level):
+    def log(self, message: str = "", level_text: str = "INFO", level_color: str | None = None):
+        if not is_higher_priority(level_text, self.display_level):
             return
-
         global _last_process, _last_level
-        level_text = normalize_level(level.strip().upper())
+        log_line = self.make(message=message, level_text=level_text, level_color=level_color)
+        print(log_line)
+        _last_process = self.process_name
+        _last_level = normalize_level(level_text.strip().upper())
+        if self.filepath:
+            with open(self.filepath, "a") as f:
+                f.write(f"{log_line}\n")
+
+    def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, ignore_kbdinterrupt: bool = True) -> str:
+        if not is_higher_priority(level_text, self.display_level):
+            return
+        global _last_process, _last_level
+        log_line = self.make(message=message, level_text=level_text, level_color=level_color)
+        print(log_line, end="")
+        _last_process = self.process_name
+        _last_level = normalize_level(level_text.strip().upper())
+        answer = ""
+        try:
+            answer = input()
+        except KeyboardInterrupt:
+            if ignore_kbdinterrupt:
+                print()
+            else:
+                raise
+        if self.filepath:
+            with open(self.filepath, "a") as f:
+                f.write(f"{log_line}{answer}\n")
+        return answer
+
+    def make(self, message: str = "", level_text: str = "INFO", level_color: str | None = None):
+        level_text = normalize_level(level_text.strip().upper())
         show_proc = (self.process_name != _last_process)
         show_level = show_proc or (level_text != _last_level)
 
-        if level_text == "DEBUG":
-            color = 'gray'
-        elif level_text == "INFO":
-            color = 'blue'
-        elif level_text == "WARN":
-            color = 'yellow'
-        elif level_text == "ERROR":
-            color = 'red'
-        elif level_text == "CRITICAL":
-            color = 'red'
-        else:
-            color = 'blue'
+        if not level_color:
+            if level_text == "DEBUG":
+                level_color = 'gray'
+            elif level_text == "INFO":
+                level_color = 'blue'
+            elif level_text == "WARN":
+                level_color = 'yellow'
+            elif level_text == "ERROR":
+                level_color = 'red'
+            elif level_text == "CRITICAL":
+                level_color = 'red'
+            else:
+                level_color = 'blue'
 
-        print(self._make(message, level_text, color, show_proc, show_level))
+        return self._make(message, level_text, level_color, show_proc, show_level)
 
-        _last_process = self.process_name
-        _last_level = level_text
-
-    def prompt(self, message: str = "", level: str = "INFO") -> str:
-        if not is_higher_priority(level, self.display_level):
-            return
-
-        global _last_process, _last_level
-        level_text = normalize_level(level.strip().upper())
-        show_proc = (self.process_name != _last_process)
-        show_level = show_proc or (level_text != _last_level)
-
-        if level_text == "DEBUG":
-            color = 'gray'
-        elif level_text == "INFO":
-            color = 'blue'
-        elif level_text == "WARN":
-            color = 'yellow'
-        elif level_text == "ERROR":
-            color = 'red'
-        elif level_text == "CRITICAL":
-            color = 'red'
-        else:
-            color = 'blue'
-
-        print(self._make(message, level_text, color, show_proc, show_level), end="")
-
-        _last_process = self.process_name
-        _last_level = level_text
-        return input()
-
-    def _make(self, message: str, level_text: str, color: str, show_proc: bool, show_level: bool):
+    def _make(self, message: str, level_text: str, level_color: str, show_proc: bool, show_level: bool):
         global _max_proc_width
         level_width = max(MAX_LOG_LEVEL_WIDTH, len(level_text))
 
@@ -110,9 +109,9 @@ class ModernLogging:
         proc_part = proc_part.ljust(_max_proc_width) if proc_part else " " * _max_proc_width
 
         if show_level:
-            level_part = f"{self._color(color)}{level_text.ljust(level_width)} |{self._color('reset')}"
+            level_part = f"{self._color(level_color)}{level_text.ljust(level_width)} |{self._color('reset')}"
         else:
-            level_part = (" " * level_width) + f"{self._color(color)} |{self._color('reset')}"
+            level_part = (" " * level_width) + f"{self._color(level_color)} |{self._color('reset')}"
 
         return f"{proc_part} {level_part} {str(message)}"
 
