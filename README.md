@@ -107,3 +107,7 @@ for i in range(5):
 
 progress_bar.finish()
 ```
+
+---
+
+![PyPI - Version](https://img.shields.io/pypi/v/nercone-modern)
