@@ -8,17 +8,23 @@
 
 import sys
 import threading
+from .color import ModernColor
+from .logging import ModernLogging
 
 class ModernProgressBar:
     _active_bars = []
     _last_rendered = False
     _lock = threading.RLock()
 
-    def __init__(self, total: int, process_name: str, spinner_mode=False):
+    def __init__(self, total: int, process_name: str, spinner_mode: bool = False, primary_color: str = "blue", secondary_color: str = "cyan", box_left: str = "[", box_right: str = "]"):
         self.total = total
-        self.spinner_mode = spinner_mode
-        self.current = 0
         self.process_name = process_name.strip()
+        self.spinner_mode = spinner_mode
+        self.primary_color = primary_color
+        self.secondary_color = secondary_color
+        self.box_left = box_left
+        self.box_right = box_right
+        self.current = 0
         self.index = len(ModernProgressBar._active_bars)
         ModernProgressBar._active_bars.append(self)
         self.log_lines = 0
@@ -62,7 +68,7 @@ class ModernProgressBar:
         self._render(advance_spinner=False)
         self._start_spinner_thread_if_needed()
 
-    def update(self, amount=1):
+    def update(self, amount: int = 1):
         if self._should_spin():
             self._render(advance_spinner=False)
             return
@@ -78,18 +84,12 @@ class ModernProgressBar:
         self._stop_spinner_thread()
         self._render(final=True, advance_spinner=False)
 
-    def makeModernLogging(self, process_name: str = None):
-        from .logging import ModernLogging
-        if not process_name:
-            process_name = self.process_name
-        return ModernLogging(process_name)
-
-    def logging(self, message: str = "", level: str = "INFO", modernLogging=None):
+    def log(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, show_proc: bool | None = None, show_level: bool | None = None, modernLogging: ModernLogging = None):
         with ModernProgressBar._lock:
             self.log_lines = 0
             if modernLogging is None:
-                modernLogging = self.makeModernLogging(self.process_name)
-            result = modernLogging._make(message, level)
+                modernLogging = ModernLogging(self.process_name)
+            result = modernLogging.make(message=message, level_text=level_text, level_color=level_color, show_proc=show_proc, show_level=show_level)
             if self.log_lines > 0:
                 move_up = self.log_lines
             else:
@@ -129,12 +129,12 @@ class ModernProgressBar:
             percentage = f"{percentage_value:3d}%"
             total_width = max(len(str(self.total)), 1)
             if final:
-                status = "(DONE)"
+                status = f"{self.box_left}DONE{self.box_right}"
             elif self.spinner_mode and self._spinner_ready:
-                status = "(RUNN)"
+                status = f"{self.box_left}RUNN{self.box_right}"
             else:
-                status = f"({self.current:>{total_width}}/{self.total})"
-            line = f"({self._color('gray')}{bar}{self._color('reset')}) {self.process_name} - {'....' if self.spinner_mode else percentage} {status} | {self.message}"
+                status = f"{self.box_left}{self.current:>{total_width}}/{self.total}{self.box_right}"
+            line = f"{ModernColor.color(self.primary_color)}{self.box_left}{ModernColor.color('reset')}{ModernColor.color('gray')}{bar}{ModernColor.color('reset')}{ModernColor.color(self.primary_color)}{self.box_right}{ModernColor.color('reset')} {self.process_name} - {'....' if self.spinner_mode else percentage} {status} | {self.message}"
             total_move_up = self.log_lines + (len(ModernProgressBar._active_bars) - self.index)
             if total_move_up > 0:
                 sys.stdout.write(f"\033[{total_move_up}A")
@@ -157,48 +157,21 @@ class ModernProgressBar:
                 center_bar = "-"
             filled_bar = "-"
             if self.current <= 0 and not self._spinner_ready:
-                return f"{self._color('gray')}{empty_bar * (bar_length + 1)}"
+                return f"{ModernColor.color('gray')}{empty_bar * (bar_length + 1)}"
             if self.current == self.total:
                 filled_length = int(progress * bar_length) + 1
             else:
                 filled_length = int(progress * bar_length)
-            return f"{self._color('blue')}{filled_bar * filled_length}{self._color('cyan')}{center_bar}{self._color('gray')}{empty_bar * (bar_length - filled_length)}"
+            return f"{ModernColor.color(self.primary_color)}{filled_bar * filled_length}{ModernColor.color(self.secondary_color)}{center_bar}{ModernColor.color('gray')}{empty_bar * (bar_length - filled_length)}"
         else:
             if self.current <= 0 and not self._spinner_ready:
-                return f"{self._color('gray')}{'-' * (bar_length + 1)}"
+                return f"{ModernColor.color('gray')}{'-' * (bar_length + 1)}"
             spinner_symbol_length = 1
             spinner_end_bar_length = bar_length - self.spinner_step
             spinner_start_bar_length = bar_length - spinner_end_bar_length
             if advance_spinner:
                 self.spinner_step = (self.spinner_step + 1) % (bar_length + 1)
-            return f"{self._color('gray')}{'-' * spinner_start_bar_length}{self._color('blue')}{'-' * spinner_symbol_length}{self._color('gray')}{'-' * spinner_end_bar_length}"
+            return f"{ModernColor.color('gray')}{'-' * spinner_start_bar_length}{ModernColor.color(self.secondary_color)}{'-' * spinner_symbol_length}{ModernColor.color('gray')}{'-' * spinner_end_bar_length}"
 
     def _should_spin(self):
         return self.spinner_mode and self._spinner_ready
-
-    def _color(self, color_name: str = "reset"):
-        if color_name == "cyan":
-            return self._color_by_code(36)
-        elif color_name == "magenta":
-            return self._color_by_code(35)
-        elif color_name == "yellow":
-            return self._color_by_code(33)
-        elif color_name == "green":
-            return self._color_by_code(32)
-        elif color_name == "red":
-            return self._color_by_code(31)
-        elif color_name == "blue":
-            return self._color_by_code(34)
-        elif color_name == "white":
-            return self._color_by_code(37)
-        elif color_name == "black":
-            return self._color_by_code(30)
-        elif color_name in ("gray", "grey"):
-            return self._color_by_code(90)
-        elif color_name == "reset":
-            return self._color_by_code(0)
-        else:
-            return ""
-
-    def _color_by_code(self, color_code: int | str = 0):
-        return f"\033[{color_code}m"
