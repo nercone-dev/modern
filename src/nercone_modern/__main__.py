@@ -11,8 +11,8 @@ from nercone_modern.logging import ModernLogging
 from nercone_modern.progressbar import ModernProgressBar
 
 logger0 = ModernLogging("Demo", display_level="DEBUG", show_level=False)
-show_proc = logger0.prompt("Show process name?", default="N", choices=["y", "N"], interrupt_ignore=True) == "Y"
-show_level = logger0.prompt("Show level name?", default="N", choices=["y", "N"], interrupt_ignore=True) == "Y"
+show_proc = logger0.prompt("Show process name?", default="N", choices=["y", "N"], interrupt_ignore=True) == "y"
+show_level = logger0.prompt("Show level name?", default="N", choices=["y", "N"], interrupt_ignore=True) == "y"
 logger1 = ModernLogging("Main", display_level="DEBUG", show_proc=show_proc, show_level=show_level)
 logger2 = ModernLogging("Sub", display_level="DEBUG", show_proc=show_proc, show_level=show_level)
 
