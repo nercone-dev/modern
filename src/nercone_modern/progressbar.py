@@ -146,7 +146,7 @@ class ModernProgressBar:
                 if self.spinner_mode:
                     status = f"{self.box_left}{' ' * total_width}/{' ' * total_width}{self.box_right} "
                 else:
-                    status = f"{self.box_left}{self.current:>{total_width}}/{self.total}{self.box_right} "
+                    status = f"{self.box_left}{self.current:>{total_width}}/{self.total:>{total_width}}{self.box_right} "
             line = f"{ModernColor.color(self.bar_color)}{'| ' if self.show_bar else ''}{ModernColor.color('reset')}{ModernColor.color(self.box_color)}{self.box_left}{ModernColor.color('reset')}{ModernColor.color('gray')}{bar}{ModernColor.color('reset')}{ModernColor.color(self.box_color)}{self.box_right}{ModernColor.color('reset')} {ModernColor.color(self.primary_color)}{proc_name}{ModernColor.color('reset')} {percentage_alt if self.spinner_mode else percentage} {status}{ModernColor.color(self.primary_color)}|{ModernColor.color('reset')} {self.message}"
             total_move_up = self.log_lines + (len(ModernProgressBar._active_bars) - self.index)
             if total_move_up > 0:
