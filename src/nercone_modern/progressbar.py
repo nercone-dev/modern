@@ -8,6 +8,7 @@
 
 import sys
 import threading
+from . import logging
 from .color import ModernColor
 from .logging import ModernLogging
 
@@ -16,7 +17,7 @@ class ModernProgressBar:
     _last_rendered = False
     _lock = threading.RLock()
 
-    def __init__(self, total: int, process_name: str, spinner_mode: bool = False, primary_bar: str = "-", secondary_bar: str = "-", centor_bar: str = "-", primary_color: str = "blue", secondary_color: str = "white", box_color: str = "white", box_left: str = "[", box_right: str = "]", show_vertical_bar: bool = True, vertical_bar_color: str = "blue"):
+    def __init__(self, total: int, process_name: str, spinner_mode: bool = False, primary_bar: str = "-", secondary_bar: str = "-", centor_bar: str = "-", primary_color: str = "blue", secondary_color: str = "green", third_color: str = "white", box_color: str = "reset", box_left: str = "[", box_right: str = "]"):
         self.total = total
         self.process_name = process_name.strip()
         self.spinner_mode = spinner_mode
@@ -25,11 +26,10 @@ class ModernProgressBar:
         self.centor_bar = centor_bar
         self.primary_color = primary_color
         self.secondary_color = secondary_color
+        self.third_color = third_color
         self.box_color = box_color
         self.box_left = box_left
         self.box_right = box_right
-        self.show_vertical_bar = show_vertical_bar
-        self.vertical_bar_color = vertical_bar_color
         self.current = 0
         self.index = len(ModernProgressBar._active_bars)
         ModernProgressBar._active_bars.append(self)
@@ -147,10 +147,10 @@ class ModernProgressBar:
             status = ""
             if not (final or (self.spinner_mode and self._spinner_ready)):
                 if self.spinner_mode:
-                    status = f"{self.box_left}{' ' * total_width}/{' ' * total_width}{self.box_right} "
+                    status = f" ({' ' * total_width}/{' ' * total_width})"
                 else:
-                    status = f"{self.box_left}{self.current:>{total_width}}/{self.total:>{total_width}}{self.box_right} "
-            line = f"{ModernColor.color(self.vertical_bar_color)}{'| ' if self.show_vertical_bar else ''}{ModernColor.color('reset')}{ModernColor.color(self.box_color)}{self.box_left}{ModernColor.color('reset')}{ModernColor.color('gray')}{bar}{ModernColor.color('reset')}{ModernColor.color(self.box_color)}{self.box_right}{ModernColor.color('reset')} {ModernColor.color(self.primary_color)}{proc_name}{ModernColor.color('reset')} {percentage_alt if self.spinner_mode else percentage} {status}{ModernColor.color(self.primary_color)}|{ModernColor.color('reset')} {self.message}"
+                    status = f" ({self.current:>{total_width}}/{self.total:>{total_width}})"
+            line = f"{ModernColor.color(self.box_color)}{self.box_left}{ModernColor.color('reset')}{ModernColor.color('gray')}{bar}{ModernColor.color('reset')}{ModernColor.color(self.box_color)}{self.box_right}{ModernColor.color('reset')} {ModernColor.color(self.primary_color)}{proc_name}{ModernColor.color('reset')} {ModernColor.color(self.secondary_color)}{percentage_alt if self.spinner_mode else percentage}{ModernColor.color('reset')}{ModernColor.color('gray')}{status}{ModernColor.color('reset')} {self.message}"
             total_move_up = self.log_lines + (len(ModernProgressBar._active_bars) - self.index)
             if total_move_up > 0:
                 sys.stdout.write(f"\033[{total_move_up}A")
@@ -164,7 +164,7 @@ class ModernProgressBar:
             sys.stdout.flush()
 
     def _progress_bar(self, progress: int, advance_spinner: bool = True):
-        bar_length = 20
+        bar_length = logging._max_prefix_width - 3
         if not self._should_spin():
             if self.current == self.total:
                 center_bar = ""
@@ -173,7 +173,7 @@ class ModernProgressBar:
             if self.current <= 0 and not self._spinner_ready:
                 return f"{ModernColor.color('gray')}{self.secondary_bar * (bar_length + 1)}"
             filled_length = int(progress * bar_length) + 1
-            return f"{ModernColor.color(self.primary_color)}{self.primary_bar * filled_length}{ModernColor.color(self.secondary_color)}{center_bar}{ModernColor.color('gray')}{self.secondary_bar * (bar_length - filled_length)}"
+            return f"{ModernColor.color(self.primary_color)}{self.primary_bar * filled_length}{ModernColor.color(self.third_color)}{center_bar}{ModernColor.color('gray')}{self.secondary_bar * (bar_length - filled_length)}"
         else:
             if self.current <= 0 and not self._spinner_ready:
                 return f"{ModernColor.color('gray')}{'-' * (bar_length + 1)}"
@@ -182,7 +182,7 @@ class ModernProgressBar:
             spinner_start_bar_length = bar_length - spinner_end_bar_length
             if advance_spinner:
                 self.spinner_step = (self.spinner_step + 1) % (bar_length + 1)
-            return f"{ModernColor.color('gray')}{'-' * spinner_start_bar_length}{ModernColor.color(self.secondary_color)}{'-' * spinner_symbol_length}{ModernColor.color('gray')}{'-' * spinner_end_bar_length}"
+            return f"{ModernColor.color('gray')}{'-' * spinner_start_bar_length}{ModernColor.color(self.third_color)}{'-' * spinner_symbol_length}{ModernColor.color('gray')}{'-' * spinner_end_bar_length}"
 
     def _should_spin(self):
         return self.spinner_mode and self._spinner_ready

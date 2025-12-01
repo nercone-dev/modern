@@ -1,9 +1,17 @@
+#!/usr/bin/env python3
+
+# -- nercone-modern --------------------------------------------- #
+# color.py on nercone-modern                                      #
+# Made by DiamondGotCat, Licensed under MIT License               #
+# Copyright (c) 2025 DiamondGotCat                                #
+# ---------------------------------------------- DiamondGotCat -- #
+
 class ModernColor:
     def color_by_code(color_code: int | str = 0):
         return f"\033[{color_code}m"
 
     def color(color_name: str = "reset"):
-        if color_name == "reset":
+        if color_name in ("reset", "default"):
             return ModernColor.color_by_code(0)
         elif color_name == "black":
             return ModernColor.color_by_code(30)

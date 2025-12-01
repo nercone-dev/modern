@@ -8,6 +8,7 @@
 
 import sys
 from .color import ModernColor
+from datetime import datetime, timezone
 
 ModernLoggingLevels = ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
 MAX_LOG_LEVEL_WIDTH = max(len(level) for level in ModernLoggingLevels)
@@ -29,6 +30,7 @@ LEVEL_ALIASES = {
 _last_process = None
 _last_level = None
 _max_proc_width = 0
+_max_prefix_width = 20
 
 def normalize_level(level: str) -> str:
     level = level.strip().upper()
@@ -43,12 +45,11 @@ def is_higher_priority(level_a: str, level_b: str) -> bool:
         raise ValueError(f"Unknown log level: {level_a} or {level_b}")
 
 class ModernLogging:
-    def __init__(self, process_name: str = "App", display_level: str = "INFO", filepath: str | None = None, show_proc: bool | None = None, show_level: bool | None = None):
+    def __init__(self, process_name: str = "App", display_level: str = "INFO", filepath: str | None = None, short_mode: bool = False):
         self.process_name = process_name
         self.display_level = display_level
         self.filepath = filepath
-        self.show_proc = show_proc
-        self.show_level = show_level
+        self.short_mode = short_mode
         global _max_proc_width
         _max_proc_width = max(_max_proc_width, len(process_name))
 
@@ -175,11 +176,8 @@ class ModernLogging:
             return lower_map[stripped.lower()]
         return None
 
-    def make(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, show_proc: bool | None = None, show_level: bool | None = None):
+    def make(self, message: str = "", level_text: str = "INFO", level_color: str | None = None):
         level_text = normalize_level(level_text.strip().upper())
-        system_show_proc = (self.process_name != _last_process)
-        system_show_level = system_show_proc or (level_text != _last_level)
-
         if not level_color:
             if level_text == "DEBUG":
                 level_color = 'gray'
@@ -193,48 +191,15 @@ class ModernLogging:
                 level_color = 'red'
             else:
                 level_color = 'blue'
+        return self._make(message=message, level_text=level_text, level_color=level_color)
 
-        if show_proc is None:
-            if self.show_proc is not None:
-                show_proc = self.show_proc
-            else:
-                show_proc = True
+    def _current_time(self) -> str:
+        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-        if show_level is None:
-            if self.show_level is not None:
-                show_level = self.show_level
-            else:
-                show_level = True
-
-        return self._make(message=message, level_text=level_text, level_color=level_color, show_proc=show_proc, show_level=show_level, system_show_proc=system_show_proc, system_show_level=system_show_level)
-
-    def _make(self, message: str = "", level_text: str = "INFO", level_color: str = "blue", show_proc: bool = False, show_level: bool = False, system_show_proc: bool = True, system_show_level: bool = True):
-        global _max_proc_width
-        level_width = max(MAX_LOG_LEVEL_WIDTH, len(level_text))
-        color_bar = f"{ModernColor.color(level_color)}|{ModernColor.color('reset')}"
-
-        if not show_proc and not show_level:
-            prefix = ""
-        else:
-            prefix = ""
-            if show_proc:
-                if system_show_proc:
-                    proc_part = self.process_name[:_max_proc_width].ljust(_max_proc_width)
-                else:
-                    proc_part = " " * _max_proc_width
-                prefix += proc_part
-                prefix += " "
-            else:
-                if show_level:
-                    prefix += " " * (_max_proc_width + 1)
-            if show_level:
-                if system_show_level:
-                    level_part = level_text.ljust(level_width)
-                    level_part = f"{ModernColor.color(level_color)}{level_part}{ModernColor.color('reset')}"
-                else:
-                    level_part = " " * level_width
-                prefix += level_part
-                if show_proc:
-                    prefix += " " * (_max_proc_width + 1)
-
-        return f"{prefix}{color_bar} {str(message)}"
+    def _make(self, message: str = "", level_text: str = "INFO", level_color: str = "blue"):
+        global _max_proc_width, _max_prefix_width
+        timestamp = self._current_time()
+        log_level = level_text.ljust(MAX_LOG_LEVEL_WIDTH)
+        proc_name = self.process_name.ljust(_max_proc_width)
+        _max_prefix_width = max(_max_prefix_width, len(f"[{timestamp} {log_level} {proc_name}]"))
+        return f"[{timestamp} {ModernColor.color(level_color)}{log_level}{ModernColor.color('reset')} {proc_name}] {message}"
