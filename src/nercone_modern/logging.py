@@ -49,7 +49,6 @@ class ModernLogging:
         self.process_name = process_name
         self.display_level = display_level
         self.filepath = filepath
-        self.short_mode = short_mode
         global _max_proc_width
         _max_proc_width = max(_max_proc_width, len(process_name))
 
