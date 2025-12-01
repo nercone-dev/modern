@@ -45,7 +45,7 @@ def is_higher_priority(level_a: str, level_b: str) -> bool:
         raise ValueError(f"Unknown log level: {level_a} or {level_b}")
 
 class ModernLogging:
-    def __init__(self, process_name: str = "App", display_level: str = "INFO", filepath: str | None = None, short_mode: bool = False):
+    def __init__(self, process_name: str = "App", display_level: str = "INFO", filepath: str | None = None):
         self.process_name = process_name
         self.display_level = display_level
         self.filepath = filepath
