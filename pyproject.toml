@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "nercone-modern"
-version = "1.11.3"
+version = "1.11.4"
 description = "Modern CLI Library"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
@@ -13,7 +13,7 @@ authors = [
 license = { text = "MIT" }
 requires-python = ">=3.6"
 dependencies = [
-    "ansi2text"
+    "strip-ansi"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
