@@ -8,6 +8,7 @@
 
 import sys
 from .color import ModernColor
+from ansi2text import Ansi2Text
 from datetime import datetime, timezone
 
 ModernLoggingLevels = ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
@@ -62,7 +63,7 @@ class ModernLogging:
         _last_level = normalize_level(level_text.strip().upper())
         if self.filepath:
             with open(self.filepath, "a") as f:
-                f.write(f"{log_line}\n")
+                f.write(f"{Ansi2Text().convert(log_line)}\n")
 
     def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, default: str | None = None, show_default: bool = False, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
         if not is_higher_priority(level_text, self.display_level):
@@ -103,7 +104,7 @@ class ModernLogging:
             self._rewrite_prompt_line_with_answer(log_line, answer)
         if self.filepath:
             with open(self.filepath, "a") as f:
-                f.write(f"{log_line}{answer}\n")
+                f.write(f"{Ansi2Text().convert(log_line)}{answer}\n")
         if choices:
             selected = self._select_choice(answer, choices)
             if selected is not None:
@@ -114,7 +115,7 @@ class ModernLogging:
                     print(log_line)
                     if self.filepath:
                         with open(self.filepath, "a") as f:
-                            f.write(f"{log_line}{answer}\n")
+                            f.write(f"{Ansi2Text().convert(log_line)}{answer}\n")
                     log_line = self.make(message=message, level_text=level_text, level_color=level_color)
                     print(log_line, end="")
                     try:
@@ -141,7 +142,7 @@ class ModernLogging:
                         self._rewrite_prompt_line_with_answer(log_line, answer)
                     if self.filepath:
                         with open(self.filepath, "a") as f:
-                            f.write(f"{log_line}{answer}\n")
+                            f.write(f"{Ansi2Text().convert(log_line)}{answer}\n")
                     if answer.strip() == "" and default is not None:
                         if choices:
                             selected_default = self._select_choice(default, choices)
