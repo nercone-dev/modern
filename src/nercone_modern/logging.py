@@ -67,7 +67,7 @@ class ModernLogging:
 
     def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, default: str | None = None, show_default: bool = False, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
         if not is_higher_priority(level_text, self.display_level):
-            return
+            return ""
         global _last_process, _last_level
         if default and show_default:
             message += f" ({default})"
@@ -202,4 +202,4 @@ class ModernLogging:
         log_level = level_text.ljust(MAX_LOG_LEVEL_WIDTH)
         proc_name = self.process_name.ljust(_max_proc_width)
         _max_prefix_width = max(_max_prefix_width, len(f"[{timestamp} {log_level} {proc_name}]"))
-        return f"[{timestamp} {ModernColor.color(level_color)}{log_level}{ModernColor.color('reset')} {proc_name}] {message}"
+        return f"[{timestamp} {ModernColor.from_name(level_color)}{log_level}{ModernColor.from_name('reset')} {proc_name}] {message}"
