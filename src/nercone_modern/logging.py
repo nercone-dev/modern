@@ -1,205 +1,176 @@
-#!/usr/bin/env python3
-
-# -- nercone-modern --------------------------------------------- #
-# logging.py on nercone-modern                                    #
-# Made by DiamondGotCat, Licensed under MIT License               #
-# Copyright (c) 2025 DiamondGotCat                                #
-# ---------------------------------------------- DiamondGotCat -- #
-
+import os
 import sys
-from .color import ModernColor
+import tty
+import fcntl
+import termios
+from enum import Enum
 from strip_ansi import strip_ansi
 from datetime import datetime, timezone
 
-ModernLoggingLevels = ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
-MAX_LOG_LEVEL_WIDTH = max(len(level) for level in ModernLoggingLevels)
-LEVEL_ALIASES = {
-    "D": "DEBUG",
-    "DEBUG": "DEBUG",
-    "I": "INFO",
-    "INFO": "INFO",
-    "INFORMATION": "INFO",
-    "W": "WARN",
-    "WARN": "WARN",
-    "WARNING": "WARN",
-    "E": "ERROR",
-    "ERROR": "ERROR",
-    "C": "CRITICAL",
-    "CRITICAL": "CRITICAL"
-}
+from .color import Color
 
-_last_process = None
-_last_level = None
-_max_proc_width = 0
-_max_prefix_width = 20
+last_process = None
+last_level = None
+max_process_width = 0
 
-def normalize_level(level: str) -> str:
-    level = level.strip().upper()
-    return LEVEL_ALIASES.get(level, level)
+class LoggingLevel(Enum):
+    DEBUG    = "DEBUG"
+    INFO     = "INFO"
+    WARNING  = "WARNING"
+    ERROR    = "ERROR"
+    CRITICAL = "CRITICAL"
 
-def is_higher_priority(level_a: str, level_b: str) -> bool:
-    a = normalize_level(level_a)
-    b = normalize_level(level_b)
-    try:
-        return ModernLoggingLevels.index(a) >= ModernLoggingLevels.index(b)
-    except ValueError:
-        raise ValueError(f"Unknown log level: {level_a} or {level_b}")
+    @staticmethod
+    def max_width() -> int:
+        return max((len(level.value) for level in list(LoggingLevel)))
 
-class ModernLogging:
-    def __init__(self, process_name: str = "App", display_level: str = "INFO", filepath: str | None = None):
+    def __ge__(a: "LoggingLevel", b: "LoggingLevel") -> bool:
+        return list(LoggingLevel).index(a) >= list(LoggingLevel).index(b)
+
+class Logging:
+    def __init__(self, process_name: str, display_level: LoggingLevel = LoggingLevel.INFO, filepath: str | os.PathLike | None = None):
         self.process_name = process_name
         self.display_level = display_level
         self.filepath = filepath
-        global _max_proc_width
-        _max_proc_width = max(_max_proc_width, len(process_name))
 
-    def log(self, message: str = "", level_text: str = "INFO", level_color: str | None = None):
-        if not is_higher_priority(level_text, self.display_level):
+        global max_process_width
+        max_process_width = max(max_process_width, len(process_name))
+
+    def log(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO):
+        global last_process, last_level
+
+        if not level >= self.display_level:
             return
-        global _last_process, _last_level
-        log_line = self.make(message=message, level_text=level_text, level_color=level_color)
-        print(log_line)
-        _last_process = self.process_name
-        _last_level = normalize_level(level_text.strip().upper())
+
+        line = self.format(content=content, level=level)
+        print(line)
+
+        last_process = self.process_name
+        last_level = level
+
         if self.filepath:
             with open(self.filepath, "a") as f:
-                f.write(f"{strip_ansi(log_line)}\n")
+                fcntl.flock(f, fcntl.LOCK_EX)
+                f.write(f"{strip_ansi(line)}\n")
 
-    def prompt(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, default: str | None = None, show_default: bool = False, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
-        if not is_higher_priority(level_text, self.display_level):
-            return ""
-        global _last_process, _last_level
-        if default and show_default:
-            message += f" ({default})"
+    def prompt(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO, default: str | None = None, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
+        global last_process, last_level
+
+        original_content = content
+        display_content = content
         if choices and show_choices:
-            message += f" [{'/'.join(choices)}]"
-        if not message.endswith(" "):
-            message += " "
-        log_line = self.make(message=message, level_text=level_text, level_color=level_color)
-        print(log_line, end="")
-        _last_process = self.process_name
-        _last_level = normalize_level(level_text.strip().upper())
-        answer = ""
-        used_default = False
+            display_content += f" [{'/'.join(choices)}]"
+        if not display_content.endswith(" "):
+            display_content += " "
+
+        prefix_line = self.format(content=display_content, level=level)
+        last_process = self.process_name
+        last_level = level
+
+        buffer: list[str] = []
+
+        def render() -> None:
+            sys.stdout.write("\r\033[K")
+            sys.stdout.write(prefix_line)
+            if not buffer and default is not None:
+                sys.stdout.write(f"{Color.from_name('gray')}{default}{Color.from_name('reset')}")
+            else:
+                sys.stdout.write("".join(buffer))
+            sys.stdout.flush()
+
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        value = default or ""
+        interrupted = False
+
         try:
-            answer = input()
-        except KeyboardInterrupt:
-            if interrupt_ignore:
-                if interrupt_default:
-                    answer = interrupt_default
-                    used_default = True
-                print()
-            else:
-                raise
-        if answer.strip() == "" and default is not None:
-            if choices:
-                selected_default = self._select_choice(default, choices)
-                if selected_default is not None:
-                    answer = default
-                    used_default = True
-            else:
-                answer = default
-                used_default = True
-        if used_default:
-            self._rewrite_prompt_line_with_answer(log_line, answer)
+            tty.setraw(fd)
+            render()
+
+            while True:
+                ch = sys.stdin.read(1)
+
+                if ch in ("\r", "\n"):
+                    current = "".join(buffer) if buffer else (default or "")
+
+                    if choices:
+                        if current in choices:
+                            value = current
+                            break
+
+                        if current:
+                            lower_matches = [c for c in choices if c.lower() == current.lower()]
+                            if lower_matches:
+                                value = lower_matches[0]
+                                break
+
+                        continue
+
+                    value = current
+                    break
+
+                elif ch == "\x03":
+                    if interrupt_ignore:
+                        value = interrupt_default if interrupt_default is not None else (default or "")
+                        break
+                    interrupted = True
+                    break
+
+                elif ch == "\x1b":
+                    next_ch = sys.stdin.read(1)
+                    if next_ch == "[":
+                        sys.stdin.read(1)
+
+                elif ch in ("\x7f", "\x08"):
+                    if buffer:
+                        buffer.pop()
+                        render()
+
+                elif " " <= ch <= "~" or ord(ch) > 127:
+                    buffer.append(ch)
+                    render()
+
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+        if interrupted:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            raise KeyboardInterrupt
+
+        final_content = original_content
+        if not final_content.endswith(" "):
+            final_content += " "
+        final_line = self.format(content=final_content, level=level)
+
+        sys.stdout.write("\r\033[K")
+        sys.stdout.write(f"{final_line}{value}\n")
+        sys.stdout.flush()
+
         if self.filepath:
             with open(self.filepath, "a") as f:
-                f.write(f"{strip_ansi(log_line)}{answer}\n")
-        if choices:
-            selected = self._select_choice(answer, choices)
-            if selected is not None:
-                return selected
-            else:
-                while True:
-                    log_line = self.make(message=f"Invalid selection. Please select from: {'/'.join(choices)}", level_text=level_text, level_color=level_color)
-                    print(log_line)
-                    if self.filepath:
-                        with open(self.filepath, "a") as f:
-                            f.write(f"{strip_ansi(log_line)}{answer}\n")
-                    log_line = self.make(message=message, level_text=level_text, level_color=level_color)
-                    print(log_line, end="")
-                    try:
-                        answer = input()
-                    except KeyboardInterrupt:
-                        if interrupt_ignore:
-                            if interrupt_default:
-                                answer = interrupt_default
-                                used_default = True
-                            print()
-                        else:
-                            raise
-                    used_default = False
-                    if answer.strip() == "" and default is not None:
-                        if choices:
-                            selected_default = self._select_choice(default, choices)
-                            if selected_default is not None:
-                                answer = default
-                                used_default = True
-                        else:
-                            answer = default
-                            used_default = True
-                    if used_default:
-                        self._rewrite_prompt_line_with_answer(log_line, answer)
-                    if self.filepath:
-                        with open(self.filepath, "a") as f:
-                            f.write(f"{strip_ansi(log_line)}{answer}\n")
-                    if answer.strip() == "" and default is not None:
-                        if choices:
-                            selected_default = self._select_choice(default, choices)
-                            if selected_default is not None:
-                                return default
-                        else:
-                            return default
-                    selected = self._select_choice(answer, choices)
-                    if selected is not None:
-                        return selected
-        return answer
+                fcntl.flock(f, fcntl.LOCK_EX)
+                f.write(f"{strip_ansi(final_line)}{value}\n")
 
-    def _rewrite_prompt_line_with_answer(self, log_line: str, answer: str) -> None:
-        try:
-            sys.stdout.write("\033[F\r")
-            sys.stdout.write(f"{log_line}{answer}  \n")
-            sys.stdout.flush()
-        except Exception:
-            print(f"{log_line}{answer}")
+        return value
 
-    def _select_choice(self, answer: str, choices: list[str]) -> str | None:
-        if answer in choices:
-            return answer
-        stripped = answer.strip()
-        if stripped in choices:
-            return stripped
-        lower_map = {c.lower(): c for c in choices}
-        if answer.lower() in lower_map:
-            return lower_map[answer.lower()]
-        if stripped.lower() in lower_map:
-            return lower_map[stripped.lower()]
-        return None
+    def format(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO):
+        global max_process_width
 
-    def make(self, message: str = "", level_text: str = "INFO", level_color: str | None = None):
-        level_text = normalize_level(level_text.strip().upper())
-        if not level_color:
-            if level_text == "DEBUG":
-                level_color = 'gray'
-            elif level_text == "INFO":
-                level_color = 'blue'
-            elif level_text == "WARN":
-                level_color = 'yellow'
-            elif level_text == "ERROR":
-                level_color = 'red'
-            elif level_text == "CRITICAL":
-                level_color = 'red'
-            else:
-                level_color = 'blue'
-        return self._make(message=message, level_text=level_text, level_color=level_color)
+        if level == LoggingLevel.DEBUG:
+            color = "gray"
+        elif level == LoggingLevel.INFO:
+            color = "blue"
+        elif level == LoggingLevel.WARNING:
+            color = "yellow"
+        elif level == LoggingLevel.ERROR:
+            color = "red"
+        elif level == LoggingLevel.CRITICAL:
+            color = "red"
+        else:
+            color = 'gray'
 
-    def _current_time(self) -> str:
-        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    def _make(self, message: str = "", level_text: str = "INFO", level_color: str = "blue"):
-        global _max_proc_width, _max_prefix_width
-        timestamp = self._current_time()
-        log_level = level_text.ljust(MAX_LOG_LEVEL_WIDTH)
-        proc_name = self.process_name.ljust(_max_proc_width)
-        _max_prefix_width = max(_max_prefix_width, len(f"[{timestamp} {log_level} {proc_name}]"))
-        return f"[{timestamp} {ModernColor.from_name(level_color)}{log_level}{ModernColor.from_name('reset')} {proc_name}] {message}"
+        prefix = f"[{timestamp} {Color.from_name(color)}{level.value.ljust(LoggingLevel.max_width())}{Color.from_name('reset')} {self.process_name.ljust(max_process_width)}]"
+        return f"{prefix} {content}"

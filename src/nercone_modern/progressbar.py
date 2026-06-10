@@ -1,188 +1,80 @@
-#!/usr/bin/env python3
-
-# -- nercone-modern --------------------------------------------- #
-# progressbar.py on nercone-modern                                #
-# Made by DiamondGotCat, Licensed under MIT License               #
-# Copyright (c) 2025 DiamondGotCat                                #
-# ---------------------------------------------- DiamondGotCat -- #
-
 import sys
 import threading
-from . import logging
-from .color import ModernColor
-from .logging import ModernLogging
 
-class ModernProgressBar:
-    _active_bars = []
-    _last_rendered = False
-    _lock = threading.RLock()
+from .color import Color
+from .logging import LoggingLevel, max_process_width as logging_max_process_width
 
-    def __init__(self, total: int, process_name: str, spinner_mode: bool = False, primary_bar: str = "-", secondary_bar: str = "-", centor_bar: str = "-", primary_color: str = "blue", secondary_color: str = "green", third_color: str = "white", box_color: str = "reset", box_left: str = "[", box_right: str = "]"):
+max_total_width = 0
+max_process_width = 0
+
+lock = threading.Lock()
+progress_bars: list["ProgressBar"] = []
+
+class ProgressBar:
+    def __init__(self, process_name: str, total: int, current: int = 0, primary_bar: str = "-", secondary_bar: str = "-", primary_color: str = "blue", secondary_color: str = "grey"):
+        self.process_name = process_name
         self.total = total
-        self.process_name = process_name.strip()
-        self.spinner_mode = spinner_mode
+        self.current = current
         self.primary_bar = primary_bar
         self.secondary_bar = secondary_bar
-        self.centor_bar = centor_bar
         self.primary_color = primary_color
         self.secondary_color = secondary_color
-        self.third_color = third_color
-        self.box_color = box_color
-        self.box_left = box_left
-        self.box_right = box_right
-        self.current = 0
-        self.index = len(ModernProgressBar._active_bars)
-        ModernProgressBar._active_bars.append(self)
-        self.log_lines = 0
+
+        self.active = False
         self.step = 0
-        self.spinner_step = 0
         self.message = "No message"
-        self._spinner_thread = None
-        self._spinner_stop_event = threading.Event()
-        self._spinner_ready = False
-        self._initial_render()
 
-    def _initial_render(self):
-        print()
+        global max_total_width, max_process_width
+        max_total_width = max(max_total_width, len(str(total)))
+        max_process_width = max(max_process_width, len(process_name))
 
-    def spinner(self, enabled: bool = True):
-        if self.spinner_mode == enabled:
-            return
-        self.spinner_mode = enabled
-        if not self._spinner_ready:
-            self._render(advance_spinner=False)
-            return
-        if enabled:
-            self._start_spinner_thread_if_needed()
-        else:
-            self._stop_spinner_thread()
-            self._render(advance_spinner=False)
-
-    def spin_start(self):
-        if self._spinner_ready and self.spinner_mode:
-            return
-        self._spinner_ready = True
-        self.spinner_mode = True
-        self.spinner_step = 0
-        self._start_spinner_thread_if_needed()
-        self._render(advance_spinner=False)
-
-    def setMessage(self, message: str = ""):
+    def set_message(self, message: str = ""):
         self.message = message
 
     def start(self):
-        self._render(advance_spinner=False)
-        self._start_spinner_thread_if_needed()
+        with lock:
+            self.active = True
+            progress_bars.append(self)
+            sys.stdout.write(self.format() + "\n")
+            sys.stdout.flush()
 
     def update(self, amount: int = 1):
-        if self._should_spin():
-            self._render(advance_spinner=False)
-            return
         self.current += amount
         if self.current > self.total:
             self.current = self.total
-        self._render(advance_spinner=False)
+        self.render()
 
     def finish(self):
         self.current = self.total
-        self.spinner_mode = False
-        self._spinner_ready = False
-        self._stop_spinner_thread()
-        self._render(final=True, advance_spinner=False)
+        self.active = False
+        self.render()
 
-    def log(self, message: str = "", level_text: str = "INFO", level_color: str | None = None, show_proc: bool | None = None, show_level: bool | None = None, modernLogging: ModernLogging | None = None):
-        with ModernProgressBar._lock:
-            self.log_lines = 0
-            if modernLogging is None:
-                modernLogging = ModernLogging(self.process_name)
-            result = modernLogging.make(message=message, level_text=level_text, level_color=level_color)
-            if self.log_lines > 0:
-                move_up = self.log_lines
-            else:
-                move_up = len(ModernProgressBar._active_bars) - self.index
-            sys.stdout.write(f"\033[{move_up}A")
-            sys.stdout.write("\033[K")
-            print(result)
-            self.log_lines += 1
-            self._render(advance_spinner=False)
+    def render(self):
+        with lock:
+            if self not in progress_bars:
+                return
 
-    def _start_spinner_thread_if_needed(self):
-        if not self._should_spin():
-            return
-        if self._spinner_thread and self._spinner_thread.is_alive():
-            return
-        self._spinner_stop_event = threading.Event()
-        self._spinner_thread = threading.Thread(target=self._spinner_worker, daemon=True)
-        self._spinner_thread.start()
+            idx = progress_bars.index(self)
+            lines_up = len(progress_bars) - idx
 
-    def _stop_spinner_thread(self):
-        if self._spinner_thread and self._spinner_thread.is_alive():
-            self._spinner_stop_event.set()
-            self._spinner_thread.join()
-        self._spinner_thread = None
-
-    def _spinner_worker(self):
-        while not self._spinner_stop_event.wait(0.05):
-            if not self._should_spin():
-                continue
-            self._render()
-
-    def _render(self, final: bool = False, advance_spinner: bool = True):
-        with ModernProgressBar._lock:
-            progress = self.current / self.total if self.total else 0
-            bar = self._progress_bar(progress, advance_spinner=advance_spinner and self._should_spin())
-            percentage_value = int(round(min(max(progress, 0), 1) * 100))
-            percentage = f"{percentage_value:3d}%"
-            if self.current == self.total:
-                percentage = "DONE"
-            percentage_alt = "    "
-            if self.spinner_mode:
-                if self._should_spin():
-                    percentage_alt = "RUNN"
-                else:
-                    percentage_alt = "WAIT"
-            name_width = max(len(bar.process_name) for bar in ModernProgressBar._active_bars) if ModernProgressBar._active_bars else len(self.process_name)
-            proc_name = f"{self.process_name:<{name_width}}"
-            total_width = max(len(str(bar.total)) for bar in ModernProgressBar._active_bars) if ModernProgressBar._active_bars else max(len(str(self.total)), 1)
-            status = ""
-            if not (final or (self.spinner_mode and self._spinner_ready)):
-                if self.spinner_mode:
-                    status = f" ({' ' * total_width}/{' ' * total_width})"
-                else:
-                    status = f" ({self.current:>{total_width}}/{self.total:>{total_width}})"
-            line = f"{ModernColor.from_name(self.box_color)}{self.box_left}{ModernColor.from_name('reset')}{ModernColor.from_name('gray')}{bar}{ModernColor.from_name('reset')}{ModernColor.from_name(self.box_color)}{self.box_right}{ModernColor.from_name('reset')} {ModernColor.from_name(self.primary_color)}{proc_name}{ModernColor.from_name('reset')} {ModernColor.from_name(self.secondary_color)}{percentage_alt if self.spinner_mode else percentage}{ModernColor.from_name('reset')}{ModernColor.from_name('gray')}{status}{ModernColor.from_name('reset')} {self.message}"
-            total_move_up = self.log_lines + (len(ModernProgressBar._active_bars) - self.index)
-            if total_move_up > 0:
-                sys.stdout.write(f"\033[{total_move_up}A")
+            sys.stdout.write(f"\033[{lines_up}A")
+            sys.stdout.write("\r\033[K")
+            sys.stdout.write(self.format())
+            sys.stdout.write(f"\033[{lines_up}B")
             sys.stdout.write("\r")
-            sys.stdout.write("\033[K")
-            sys.stdout.write(line)
-            sys.stdout.write("\n")
-            down_lines = max(total_move_up - 1, 0)
-            if down_lines > 0:
-                sys.stdout.write(f"\033[{down_lines}B")
             sys.stdout.flush()
 
-    def _progress_bar(self, progress: int | float, advance_spinner: bool = True):
-        bar_length = logging._max_prefix_width - 3
-        if not self._should_spin():
-            if self.current == self.total:
-                center_bar = ""
-            else:
-                center_bar = self.centor_bar
-            if self.current <= 0 and not self._spinner_ready:
-                return f"{ModernColor.from_name('gray')}{self.secondary_bar * (bar_length + 1)}"
-            filled_length = int(progress * bar_length) + 1
-            return f"{ModernColor.from_name(self.primary_color)}{self.primary_bar * filled_length}{ModernColor.from_name(self.third_color)}{center_bar}{ModernColor.from_name('gray')}{self.secondary_bar * (bar_length - filled_length)}"
-        else:
-            if self.current <= 0 and not self._spinner_ready:
-                return f"{ModernColor.from_name('gray')}{'-' * (bar_length + 1)}"
-            spinner_symbol_length = 1
-            spinner_end_bar_length = bar_length - self.spinner_step
-            spinner_start_bar_length = bar_length - spinner_end_bar_length
-            if advance_spinner:
-                self.spinner_step = (self.spinner_step + 1) % (bar_length + 1)
-            return f"{ModernColor.from_name('gray')}{'-' * spinner_start_bar_length}{ModernColor.from_name(self.third_color)}{'-' * spinner_symbol_length}{ModernColor.from_name('gray')}{'-' * spinner_end_bar_length}"
+    def format(self):
+        progress = self.current / self.total
+        percentage = int(progress * 100)
+        return f"[{self.bar()}] {Color.from_name(self.primary_color)}{self.process_name.ljust(max_process_width)}{Color.from_name('reset')} {Color.from_name(self.secondary_color)}{'DONE' if self.completed else f'{percentage}%':>4}{Color.from_name('reset')}{Color.from_name('gray')}{f' ({self.current:>{max_total_width}}/{self.total:>{max_total_width}})' if not self.completed else ''}{Color.from_name('reset')} {self.message}{Color.from_name('reset')}"
 
-    def _should_spin(self):
-        return self.spinner_mode and self._spinner_ready
+    def bar(self):
+        progress = self.current / self.total
+        bar_length = 20 + LoggingLevel.max_width() + logging_max_process_width
+        bar_filled_length = int(bar_length * progress)
+        return f"{Color.from_name(self.primary_color)}{self.primary_bar * bar_filled_length}{Color.from_name(self.secondary_color)}{self.secondary_bar * (bar_length - bar_filled_length)}{Color.from_name('reset')}"
+
+    @property
+    def completed(self) -> bool:
+        return self.current >= self.total

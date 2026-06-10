@@ -1,6 +1,5 @@
-__pycache__/
-*/__pycache__/
-**/__pycache__/
-dist/
-*/dist/
-**/dist/
+# macOS
+.DS_Store
+
+# Python
+__pycache__
