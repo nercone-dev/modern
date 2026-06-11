@@ -8,8 +8,8 @@ from .progressbar import ProgressBar
 def demo_color():
     print(f"── Color ──")
     line = ""
-    for name in ["red", "green", "yellow", "blue", "magenta", "cyan", "white", "gray", "bright_red", "bright_green", "bright_yellow", "bright_blue", "bright_magenta", "bright_cyan", "bright_white"]:
-        line += f"{Color.from_name(name)}{name}{Color.from_name('reset')}  "
+    for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
+        line += f"{Color.from_name(name)} {name} {Color.from_name('reset')}  "
     print(line)
 
     line = ""
@@ -27,12 +27,20 @@ def demo_text():
 
 def demo_logging():
     print(f"\n── Logging ──")
-    main = Logging("Main", display_level=LoggingLevel.DEBUG)
-    sub  = Logging("Sub",  display_level=LoggingLevel.DEBUG)
-    main.log("Main #1", LoggingLevel.INFO)
-    sub.log("Sub #1", LoggingLevel.WARNING)
-    main.log("Main #2", LoggingLevel.ERROR)
-    sub.log("Sub #2", LoggingLevel.CRITICAL)
+    main = Logging("Main", primary_color="cyan",  display_level=LoggingLevel.DEBUG)
+    sub  = Logging("Sub",  primary_color="green", display_level=LoggingLevel.DEBUG)
+    main.log("Main #0", LoggingLevel.INFO)
+    time.sleep(1)
+    main.log("Main #1", LoggingLevel.WARNING)
+    sub.log("Sub #0", LoggingLevel.INFO)
+    time.sleep(2)
+    main.log("Main #2", LoggingLevel.INFO)
+    time.sleep(1)
+    main.log("Main #3", LoggingLevel.ERROR)
+    sub.log("Sub #1", LoggingLevel.CRITICAL)
+    time.sleep(2)
+    main.log("Main #4", LoggingLevel.CRITICAL)
+    time.sleep(1)
 
 def demo_progressbar():
     print(f"\n── ProgressBar ──")

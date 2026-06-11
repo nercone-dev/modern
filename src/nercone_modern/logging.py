@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from .color import Color
 
 last_process = None
-last_level = None
+last_timestamp = None
 
 max_prefix_width = 0
 max_process_width = 0
@@ -30,16 +30,21 @@ class LoggingLevel(Enum):
         return list(LoggingLevel).index(a) >= list(LoggingLevel).index(b)
 
 class Logging:
-    def __init__(self, process_name: str, display_level: LoggingLevel = LoggingLevel.INFO, filepath: str | os.PathLike | None = None):
+    def __init__(self, process_name: str, primary_color: str = "cyan", display_level: LoggingLevel = LoggingLevel.INFO, filepath: str | os.PathLike | None = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
         self.process_name = process_name
+        self.primary_color = primary_color
         self.display_level = display_level
         self.filepath = filepath
+
+        self.show_process_name = show_process_name
+        self.show_level = show_level
+        self.show_timestamp = show_timestamp
 
         global max_process_width
         max_process_width = max(max_process_width, len(process_name))
 
     def log(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO):
-        global last_process, last_level
+        global last_process
 
         if not level >= self.display_level:
             return
@@ -48,7 +53,6 @@ class Logging:
         print(line)
 
         last_process = self.process_name
-        last_level = level
 
         if self.filepath:
             with open(self.filepath, "a") as f:
@@ -56,7 +60,7 @@ class Logging:
                 f.write(f"{strip_ansi(line)}\n")
 
     def prompt(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO, default: str | None = None, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
-        global last_process, last_level
+        global last_process
 
         original_content = content
         display_content = content
@@ -67,7 +71,6 @@ class Logging:
 
         prefix_line = self.format(content=display_content, level=level)
         last_process = self.process_name
-        last_level = level
 
         buffer: list[str] = []
 
@@ -157,25 +160,29 @@ class Logging:
         return value
 
     def format(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO):
-        global max_process_width
+        global max_process_width, max_prefix_width, last_process, last_timestamp
 
         if level == LoggingLevel.DEBUG:
-            color = Color.from_name("gray")
+            level_color = Color.from_name("gray")
         elif level == LoggingLevel.INFO:
-            color = Color.from_name("blue")
+            level_color = Color.from_name("blue")
         elif level == LoggingLevel.WARNING:
-            color = Color.from_name("yellow")
+            level_color = Color.from_name("yellow")
         elif level == LoggingLevel.ERROR:
-            color = Color.from_name("red")
+            level_color = Color.from_name("red")
         elif level == LoggingLevel.CRITICAL:
-            color = Color.from_name("red", background=True) + Color.from_name("white")
+            level_color = Color.from_name("red", background=True) + Color.from_name("white")
         else:
-            color = Color.from_name("gray")
+            level_color = Color.from_name("gray")
 
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        prefix = f"[{timestamp} {color}{level.value.ljust(LoggingLevel.max_width())}{Color.from_name('reset')} {self.process_name.ljust(max_process_width)}]"
 
-        global max_prefix_width
+        prefix_process_name = f"{Color.from_name(self.primary_color)}{' ' * max_process_width if self.process_name == last_process else self.process_name.ljust(max_process_width)}{Color.from_name('reset')}"
+        prefix_level        = f"{level_color}{level.value.ljust(LoggingLevel.max_width())}{Color.from_name('reset')}"
+        prefix_timestamp    = f"{Color.from_name('gray')}{' ' * len(timestamp) if timestamp == last_timestamp else timestamp}{Color.from_name('reset')}"
+        prefix              = f"{prefix_timestamp + ' ' if self.show_timestamp else ''}{prefix_process_name + ' ' if self.show_process_name else ''}{prefix_level + ' ' if self.show_level else ''}"
+
+        last_timestamp = timestamp
         max_prefix_width = max(max_prefix_width, len(strip_ansi(prefix)))
 
-        return f"{prefix} {content}"
+        return f"{prefix}{('\n' + (' ' * len(strip_ansi(prefix)))).join(content.split('\n'))}"

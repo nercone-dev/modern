@@ -11,10 +11,11 @@ lock = threading.Lock()
 progress_bars: list["ProgressBar"] = []
 
 class ProgressBar:
-    def __init__(self, process_name: str, total: int, current: int = 0, start: bool = True, primary_bar: str = "━", secondary_bar: str = "━", primary_color: str = "blue", secondary_color: str = "grey"):
+    def __init__(self, process_name: str, total: int, current: int = 0, start: bool = True, bar_length: int | None = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: str = "blue", secondary_color: str = "grey"):
         self.process_name = process_name
         self.total = total
         self.current = current
+        self.bar_length = bar_length
         self.primary_bar = primary_bar
         self.secondary_bar = secondary_bar
         self.primary_color = primary_color
@@ -76,7 +77,7 @@ class ProgressBar:
 
     def bar(self):
         progress = self.current / self.total
-        bar_length = logging.max_prefix_width
+        bar_length = self.bar_length or 30 if self.bar_length is not None or logging.max_prefix_width <= 1 else logging.max_prefix_width - 1
         bar_filled_length = int(bar_length * progress)
         return f"{Color.from_name(self.primary_color)}{self.primary_bar * bar_filled_length}{Color.from_name(self.secondary_color)}{self.secondary_bar * (bar_length - bar_filled_length)}{Color.from_name('reset')}"
 
