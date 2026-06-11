@@ -62,7 +62,7 @@ class Color:
                 return Color.from_code(45)
             elif name == "cyan":
                 return Color.from_code(46)
-            elif name in ("white", "bright_gray", "bright_gray", "light_gray", "light_gray"):
+            elif name in ("white", "bright_gray", "bright_grey", "light_gray", "light_grey"):
                 return Color.from_code(47)
             elif name in ("bright_black", "gray", "grey"):
                 return Color.from_code(100)

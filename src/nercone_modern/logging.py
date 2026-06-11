@@ -11,6 +11,8 @@ from .color import Color
 
 last_process = None
 last_level = None
+
+max_prefix_width = 0
 max_process_width = 0
 
 class LoggingLevel(Enum):
@@ -158,19 +160,22 @@ class Logging:
         global max_process_width
 
         if level == LoggingLevel.DEBUG:
-            color = "gray"
+            color = Color.from_name("gray")
         elif level == LoggingLevel.INFO:
-            color = "blue"
+            color = Color.from_name("blue")
         elif level == LoggingLevel.WARNING:
-            color = "yellow"
+            color = Color.from_name("yellow")
         elif level == LoggingLevel.ERROR:
-            color = "red"
+            color = Color.from_name("red")
         elif level == LoggingLevel.CRITICAL:
-            color = "red"
+            color = Color.from_name("red", background=True) + Color.from_name("white")
         else:
-            color = 'gray'
+            color = Color.from_name("gray")
 
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        prefix = f"[{timestamp} {color}{level.value.ljust(LoggingLevel.max_width())}{Color.from_name('reset')} {self.process_name.ljust(max_process_width)}]"
 
-        prefix = f"[{timestamp} {Color.from_name(color)}{level.value.ljust(LoggingLevel.max_width())}{Color.from_name('reset')} {self.process_name.ljust(max_process_width)}]"
+        global max_prefix_width
+        max_prefix_width = max(max_prefix_width, len(strip_ansi(prefix)))
+
         return f"{prefix} {content}"
