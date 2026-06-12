@@ -12,7 +12,6 @@ from .color import Color
 last_process = None
 last_timestamp = None
 
-max_prefix_width = 0
 max_process_width = 0
 
 class LoggingLevel(Enum):
@@ -159,8 +158,8 @@ class Logging:
 
         return value
 
-    def format(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO):
-        global max_process_width, max_prefix_width, last_process, last_timestamp
+    def format(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO) -> str:
+        global max_process_width, last_process, last_timestamp
 
         if level == LoggingLevel.DEBUG:
             level_color = Color.from_name("gray")
@@ -183,6 +182,5 @@ class Logging:
         prefix              = f"{prefix_timestamp + ' ' if self.show_timestamp else ''}{prefix_process_name + ' ' if self.show_process_name else ''}{prefix_level + ' ' if self.show_level else ''}"
 
         last_timestamp = timestamp
-        max_prefix_width = max(max_prefix_width, len(strip_ansi(prefix)))
 
         return f"{prefix}{('\n' + (' ' * len(strip_ansi(prefix)))).join(content.split('\n'))}"
