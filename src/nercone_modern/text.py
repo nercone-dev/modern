@@ -16,7 +16,7 @@ class Text:
             else:
                 return Text(f"{self.color}{self.content}{other.color}{other.content}", Color.from_name("reset"))
         elif isinstance(other, str):
-            return Text(f"{self.content}{self.color}{other}", Color.from_name("reset"))
+            return Text(f"{self.color}{self.content}{other}", Color.from_name("reset"))
 
     def __str__(self):
         return f"{self.color}{self.content}{Color.from_name('reset')}"
