@@ -2,21 +2,19 @@ from typing import Union
 from .color import Color
 
 class Text:
-    def __init__(self, content: str = "", color: str = "white"):
+    def __init__(self, content: str = "", forground_color: str | Color = Color("default"), background_color: Color = Color("default")):
         self.content = content
-        if color.startswith("\033"):
-            self.color = color
-        else:
-            self.color = Color.from_name("white")
+        self.forground_color = Color(forground_color)
+        self.background_color = Color(background_color, background=True)
 
     def __add__(self, other: Union[str, "Text"]) -> "Text":
         if isinstance(other, Text):
-            if self.color == other.color:
-                return Text(self.content + other.content, self.color)
+            if self.forground_color == other.background_color and self.background_color == other.background_color:
+                return Text(self.content + other.content, self.forground_color, self.background_color)
             else:
-                return Text(f"{self.color}{self.content}{other.color}{other.content}", Color.from_name("reset"))
+                return Text(f"{self}{other}")
         elif isinstance(other, str):
-            return Text(f"{self.color}{self.content}{other}", Color.from_name("reset"))
+            return Text(f"{self}{other}")
 
     def __str__(self):
-        return f"{self.color}{self.content}{Color.from_name('reset')}"
+        return f"{self.forground_color}{self.forground_color}{self.content}{Color('reset')}"

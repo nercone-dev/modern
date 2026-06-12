@@ -10,15 +10,15 @@ progress_bars: list["ProgressBar"] = []
 max_total_width = 0
 
 class ProgressBar:
-    def __init__(self, process_name: str, total: int, current: int = 0, start: bool = True, bar_length: int | None = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: str = "blue", secondary_color: str = "grey"):
+    def __init__(self, process_name: str, total: int, current: int = 0, start: bool = True, bar_length: int | None = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: str | Color = "blue", secondary_color: str | Color = "grey"):
         self.process_name = process_name
         self.total = total
         self.current = current
         self.bar_length = bar_length
         self.primary_bar = primary_bar
         self.secondary_bar = secondary_bar
-        self.primary_color = primary_color
-        self.secondary_color = secondary_color
+        self.primary_color = Color(primary_color)
+        self.secondary_color = Color(secondary_color)
 
         self.active = False
         self.step = 0
@@ -77,20 +77,20 @@ class ProgressBar:
     def format(self):
         suffix = self.suffix()
         bar = self.bar(self.bar_length or (shutil.get_terminal_size((len(strip_ansi(suffix)) + 31, 1)).columns - len(strip_ansi(suffix)) - 1))
-        return f"{bar} {suffix}{Color.from_name('reset')}"
+        return f"{bar} {suffix}{Color('reset')}"
 
     def bar(self, length: int):
         filled_length = int(length * (self.current / self.total))
-        return f"{Color.from_name(self.primary_color)}{self.primary_bar * filled_length}{Color.from_name(self.secondary_color)}{self.secondary_bar * (length - filled_length)}{Color.from_name('reset')}"
+        return f"{self.primary_color}{self.primary_bar * filled_length}{self.secondary_color}{self.secondary_bar * (length - filled_length)}{Color('reset')}"
 
     def suffix(self):
         global progress_bars
 
         def build_parts(bar: ProgressBar) -> list[str]:
             return [
-                f"{Color.from_name(bar.primary_color)}{bar.process_name}{Color.from_name('reset')}",
-                f"{Color.from_name(bar.secondary_color)}{'DONE' if bar.completed else f'{int((bar.current / bar.total) * 100)}%':>4}{Color.from_name('reset')}",
-                f"{Color.from_name(bar.secondary_color)}({bar.current:>{max_total_width}}/{bar.total:>{max_total_width}}){Color.from_name('reset')}" if not bar.completed else '',
+                f"{bar.primary_color}{bar.process_name}{Color('reset')}",
+                f"{bar.secondary_color}{'DONE' if bar.completed else f'{int((bar.current / bar.total) * 100)}%':>4}{Color('reset')}",
+                f"{bar.secondary_color}({bar.current:>{max_total_width}}/{bar.total:>{max_total_width}}){Color('reset')}" if not bar.completed else '',
                 bar.message
             ]
 

@@ -29,9 +29,9 @@ class LoggingLevel(Enum):
         return list(LoggingLevel).index(a) >= list(LoggingLevel).index(b)
 
 class Logging:
-    def __init__(self, process_name: str, primary_color: str = "cyan", display_level: LoggingLevel = LoggingLevel.INFO, filepath: str | os.PathLike | None = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
+    def __init__(self, process_name: str, primary_color: str | Color = "cyan", display_level: LoggingLevel = LoggingLevel.INFO, filepath: str | os.PathLike | None = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
         self.process_name = process_name
-        self.primary_color = primary_color
+        self.primary_color = Color(primary_color)
         self.display_level = display_level
         self.filepath = filepath
 
@@ -77,7 +77,7 @@ class Logging:
             sys.stdout.write("\r\033[K")
             sys.stdout.write(prefix_line)
             if not buffer and default is not None:
-                sys.stdout.write(f"{Color.from_name('gray')}{default}{Color.from_name('reset')}")
+                sys.stdout.write(f"{Color('gray')}{default}{Color('reset')}")
             else:
                 sys.stdout.write("".join(buffer))
             sys.stdout.flush()
@@ -162,23 +162,23 @@ class Logging:
         global max_process_width, last_process, last_timestamp
 
         if level == LoggingLevel.DEBUG:
-            level_color = Color.from_name("gray")
+            level_color = Color("gray")
         elif level == LoggingLevel.INFO:
-            level_color = Color.from_name("blue")
+            level_color = Color("blue")
         elif level == LoggingLevel.WARNING:
-            level_color = Color.from_name("yellow")
+            level_color = Color("yellow")
         elif level == LoggingLevel.ERROR:
-            level_color = Color.from_name("red")
+            level_color = Color("red")
         elif level == LoggingLevel.CRITICAL:
-            level_color = Color.from_name("red", background=True) + Color.from_name("white")
+            level_color = Color("red", background=True) + Color("white")
         else:
-            level_color = Color.from_name("gray")
+            level_color = Color("gray")
 
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-        prefix_process_name = f"{Color.from_name(self.primary_color)}{' ' * max_process_width if self.process_name == last_process else self.process_name.ljust(max_process_width)}{Color.from_name('reset')}"
-        prefix_level        = f"{level_color}{level.value.ljust(LoggingLevel.max_width())}{Color.from_name('reset')}"
-        prefix_timestamp    = f"{Color.from_name('gray')}{' ' * len(timestamp) if timestamp == last_timestamp else timestamp}{Color.from_name('reset')}"
+        prefix_process_name = f"{self.primary_color}{' ' * max_process_width if self.process_name == last_process else self.process_name.ljust(max_process_width)}{Color('reset')}"
+        prefix_level        = f"{level_color}{level.value.ljust(LoggingLevel.max_width())}{Color('reset')}"
+        prefix_timestamp    = f"{Color('gray')}{' ' * len(timestamp) if timestamp == last_timestamp else timestamp}{Color('reset')}"
         prefix              = f"{prefix_timestamp + ' ' if self.show_timestamp else ''}{prefix_process_name + ' ' if self.show_process_name else ''}{prefix_level + ' ' if self.show_level else ''}"
 
         last_timestamp = timestamp

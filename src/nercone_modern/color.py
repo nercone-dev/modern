@@ -1,10 +1,24 @@
 class Color:
-    @staticmethod
-    def from_code(color_code: int | str = 0):
-        return f"\033[{color_code}m"
+    def __init__(self, color: str | "Color" = "default", background: bool = False):
+        if isinstance(color, str):
+            if color.startswith("\033"):
+                self.color = color
+            elif color.isdecimal():
+                self.color = Color.from_code(color).color
+            else:
+                self.color = Color.from_name(color, background=background).color
+        elif isinstance(color, Color):
+            self.color = color.color
+
+    def __str__(self):
+        return self.color
 
     @staticmethod
-    def from_name(name: str = "default", background: bool = False):
+    def from_code(color_code: int | str = 0) -> "Color":
+        return Color(f"\033[{color_code}m")
+
+    @staticmethod
+    def from_name(name: str = "default", background: bool = False) -> "Color":
         name = name.strip().lower()
         if name in ("default", "reset"):
             return Color.from_code(0)
@@ -46,7 +60,7 @@ class Color:
             elif name == "bright_white":
                 return Color.from_code(97)
             else:
-                return ""
+                return Color()
         elif background:
             if name == "black":
                 return Color.from_code(40)
@@ -81,4 +95,4 @@ class Color:
             elif name == "bright_white":
                 return Color.from_code(107)
             else:
-                return ""
+                return Color()

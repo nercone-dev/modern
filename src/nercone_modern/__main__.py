@@ -6,27 +6,27 @@ from .logging import Logging, LoggingLevel
 from .progressbar import ProgressBar
 
 def demo_color():
-    print(f"── Color ──")
+    print("── Color ──")
     line = ""
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
-        line += f"{Color.from_name(name)} {name} {Color.from_name('reset')}  "
+        line += Text(f" {name} ", forground_color=name)
     print(line)
 
     line = ""
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
-        line += f"{Color.from_name(name, background=True)}{Color.from_name('white')} {name} {Color.from_name('reset')}  "
+        line += Text(f" {name} ", background_color=name)
     print(line)
 
 def demo_text():
-    print(f"\n── Text ──")
-    a = Text("Hello, ", Color.from_name("cyan"))
-    b = Text("world!", Color.from_name("yellow"))
+    print("\n── Text ──")
+    a = Text("Hello, ", "cyan")
+    b = Text("world!", "yellow")
     print(str(a))
     print(str(b))
     print(str(a + b))
 
 def demo_logging():
-    print(f"\n── Logging ──")
+    print("\n── Logging ──")
     main = Logging("Main", primary_color="cyan",  display_level=LoggingLevel.DEBUG)
     sub  = Logging("Sub",  primary_color="green", display_level=LoggingLevel.DEBUG)
     main.log("Main #0", LoggingLevel.INFO)
@@ -43,7 +43,7 @@ def demo_logging():
     time.sleep(1)
 
 def demo_progressbar():
-    print(f"\n── ProgressBar ──")
+    print("\n── ProgressBar ──")
 
     def run(bar: ProgressBar, step_ms: int):
         for _ in range(bar.total):
