@@ -1,5 +1,7 @@
 import sys
+import shutil
 import threading
+from strip_ansi import strip_ansi
 
 from . import logging
 from .color import Color
@@ -73,11 +75,16 @@ class ProgressBar:
     def format(self):
         progress = self.current / self.total
         percentage = int(progress * 100)
-        return f"{self.bar()} {Color.from_name(self.primary_color)}{self.process_name.ljust(max_process_width)}{Color.from_name('reset')} {Color.from_name(self.secondary_color)}{'DONE' if self.completed else f'{percentage}%':>4}{Color.from_name('reset')}{Color.from_name('gray')}{f' ({self.current:>{max_total_width}}/{self.total:>{max_total_width}})' if not self.completed else ''}{Color.from_name('reset')} {self.message}{Color.from_name('reset')}"
 
-    def bar(self):
+        suffix = f"{Color.from_name(self.primary_color)}{self.process_name.ljust(max_process_width)}{Color.from_name('reset')} {Color.from_name(self.secondary_color)}{'DONE' if self.completed else f'{percentage}%':>4}{Color.from_name('reset')}{Color.from_name('gray')}{f' ({self.current:>{max_total_width}}/{self.total:>{max_total_width}})' if not self.completed else ''}{Color.from_name('reset')} {self.message}"
+
+        terminal_size = shutil.get_terminal_size((len(strip_ansi(suffix)) + 31, 1))
+        bar_length = (terminal_size.columns - len(strip_ansi(suffix)) - 1) if (self.bar_length is not None or logging.max_prefix_width <= 1) else (self.bar_length or logging.max_prefix_width - 1)
+
+        return f"{self.bar(bar_length)} {suffix}{Color.from_name('reset')}"
+
+    def bar(self, bar_length: int):
         progress = self.current / self.total
-        bar_length = self.bar_length or 30 if self.bar_length is not None or logging.max_prefix_width <= 1 else logging.max_prefix_width - 1
         bar_filled_length = int(bar_length * progress)
         return f"{Color.from_name(self.primary_color)}{self.primary_bar * bar_filled_length}{Color.from_name(self.secondary_color)}{self.secondary_bar * (bar_length - bar_filled_length)}{Color.from_name('reset')}"
 
