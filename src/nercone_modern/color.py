@@ -1,5 +1,7 @@
+from typing import Union
+
 class Color:
-    def __init__(self, color: str | "Color" = "default", background: bool = False):
+    def __init__(self, color: Union[str, "Color"] = "default", background: bool = False):
         if isinstance(color, str):
             if color.startswith("\033"):
                 self.color = color
@@ -12,6 +14,9 @@ class Color:
 
     def __str__(self):
         return self.color
+
+    def __add__(self, other: Union[str, "Color"]) -> "Color":
+        return Color(str(self) + str(other))
 
     @staticmethod
     def from_code(color_code: int | str = 0) -> "Color":

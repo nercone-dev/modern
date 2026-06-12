@@ -2,7 +2,7 @@ from typing import Union
 from .color import Color
 
 class Text:
-    def __init__(self, content: str = "", forground_color: str | Color = Color("default"), background_color: Color = Color("default")):
+    def __init__(self, content: str = "", forground_color: str | Color = Color("default"), background_color: str | Color = Color("default")):
         self.content = content
         self.forground_color = Color(forground_color)
         self.background_color = Color(background_color, background=True)

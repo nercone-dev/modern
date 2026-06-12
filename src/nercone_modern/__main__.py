@@ -1,18 +1,17 @@
 import time
 
-from .color import Color
 from .text import Text
 from .logging import Logging, LoggingLevel
 from .progressbar import ProgressBar
 
 def demo_color():
     print("── Color ──")
-    line = ""
+    line = Text()
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
         line += Text(f" {name} ", forground_color=name)
     print(line)
 
-    line = ""
+    line = Text()
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
         line += Text(f" {name} ", background_color=name)
     print(line)
