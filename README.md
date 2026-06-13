@@ -1,4 +1,4 @@
 ![](assets/modern.png)
 
 # modern
-Modern CLI Library
+Modern Logging and Progress Bar Library

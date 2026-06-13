@@ -135,6 +135,6 @@
     <polygon class="cls-7" points="1096 384 1096 396 1092 396 1092 400 1088 400 1088 404 1068 404 1068 396 1064 396 1064 384 1060 384 1060 368 1056 368 1056 360 1052 360 1052 356 1048 356 1048 352 1044 352 1044 348 1040 348 1040 344 1036 344 1036 340 1048 340 1048 336 1060 336 1060 340 1072 340 1072 348 1076 348 1076 356 1080 356 1080 364 1084 364 1084 368 1088 368 1088 376 1092 376 1092 384 1096 384"/>
   </g>
   <text class="cls-5" transform="translate(123.98 329.97)"><tspan x="0" y="0">Nercone Modern</tspan></text>
-  <text class="cls-6" transform="translate(127.81 382.64)"><tspan x="0" y="0">Modern CLI Library</tspan></text>
+  <text class="cls-6" transform="translate(127.81 382.64)"><tspan x="0" y="0">Modern Logging and Progress Bar Library </tspan></text>
   <text class="cls-4" transform="translate(128.3 506.88)"><tspan x="0" y="0">Nercone</tspan></text>
 </svg>
