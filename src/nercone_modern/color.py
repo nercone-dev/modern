@@ -25,8 +25,10 @@ class Color:
     @staticmethod
     def from_name(name: str = "default", background: bool = False) -> "Color":
         name = name.strip().lower()
-        if name in ("default", "reset"):
+        if name == "reset":
             return Color.from_code(0)
+        elif name == "default":
+            return Color.from_code(49 if background else 39)
         elif name == "bold":
             return Color.from_code(1)
         elif name == "underline":

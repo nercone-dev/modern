@@ -8,12 +8,12 @@ def demo_color():
     print("── Color ──")
     line = Text()
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
-        line += Text(f" {name} ", forground_color=name)
+        line += Text(f" {name} ", forground_color=name) + " "
     print(line)
 
     line = Text()
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
-        line += Text(f" {name} ", background_color=name)
+        line += Text(f" {name} ", forground_color="white", background_color=name) + " "
     print(line)
 
 def demo_text():
