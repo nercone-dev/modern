@@ -42,7 +42,7 @@ class Logging:
         global max_process_width
         max_process_width = max(max_process_width, len(process_name))
 
-    def log(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO):
+    def log(self, content: str = "", *, level: LoggingLevel = LoggingLevel.INFO):
         global last_process
 
         if not level >= self.display_level:
@@ -58,24 +58,37 @@ class Logging:
                 fcntl.flock(f, fcntl.LOCK_EX)
                 f.write(f"{strip_ansi(line)}\n")
 
-    def prompt(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO, default: str | None = None, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
+    def debug(self, content: str = ""):
+        self.log(content, level=LoggingLevel.DEBUG)
+
+    def info(self, content: str = ""):
+        self.log(content, level=LoggingLevel.INFO)
+
+    def warning(self, content: str = ""):
+        self.log(content, level=LoggingLevel.WARNING)
+
+    def error(self, content: str = ""):
+        self.log(content, level=LoggingLevel.ERROR)
+
+    def critical(self, content: str = ""):
+        self.log(content, level=LoggingLevel.CRITICAL)
+
+    def prompt(self, content: str = "", *, level: LoggingLevel = LoggingLevel.INFO, default: str | None = None, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
         global last_process
 
-        original_content = content
         display_content = content
         if choices and show_choices:
             display_content += f" [{'/'.join(choices)}]"
         if not display_content.endswith(" "):
             display_content += " "
 
-        prefix_line = self.format(content=display_content, level=level)
-        last_process = self.process_name
+        line = self.format(content=display_content, level=level)
 
         buffer: list[str] = []
 
-        def render() -> None:
+        def render():
             sys.stdout.write("\r\033[K")
-            sys.stdout.write(prefix_line)
+            sys.stdout.write(line)
             if not buffer and default is not None:
                 sys.stdout.write(f"{Color('gray')}{default}{Color('reset')}")
             else:
@@ -142,19 +155,20 @@ class Logging:
             sys.stdout.flush()
             raise KeyboardInterrupt
 
-        final_content = original_content
-        if not final_content.endswith(" "):
-            final_content += " "
-        final_line = self.format(content=final_content, level=level)
+        if not content.endswith(" "):
+            content += " "
+        line = self.format(content=content, level=level)
 
         sys.stdout.write("\r\033[K")
-        sys.stdout.write(f"{final_line}{value}\n")
+        sys.stdout.write(f"{line}{value}\n")
         sys.stdout.flush()
 
         if self.filepath:
             with open(self.filepath, "a") as f:
                 fcntl.flock(f, fcntl.LOCK_EX)
-                f.write(f"{strip_ansi(final_line)}{value}\n")
+                f.write(f"{strip_ansi(line)}{value}\n")
+
+        last_process = self.process_name
 
         return value
 
