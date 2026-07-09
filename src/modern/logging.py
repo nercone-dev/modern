@@ -1,12 +1,16 @@
 import os
 import sys
-import tty
-import fcntl
-import termios
 from enum import Enum
 from typing import Optional, Union, List
 from datetime import datetime, timezone
 from strip_ansi import strip_ansi
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import tty
+    import fcntl
+    import termios
 
 from .color import Color
 
@@ -56,7 +60,12 @@ class Logging:
 
         if self.filepath:
             with open(self.filepath, "a") as f:
-                fcntl.flock(f, fcntl.LOCK_EX)
+                if os.name == "nt":
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+                    f.seek(0, os.SEEK_END)
+                else:
+                    fcntl.flock(f, fcntl.LOCK_EX)
                 f.write(f"{strip_ansi(line)}\n")
 
     def debug(self, content: str = ""):
@@ -98,17 +107,19 @@ class Logging:
                 sys.stdout.write("".join(buffer))
             sys.stdout.flush()
 
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
+        if os.name != "nt":
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
         value = default or ""
         interrupted = False
 
         try:
-            tty.setraw(fd)
+            if os.name != "nt":
+                tty.setraw(fd)
             render()
 
             while True:
-                ch = sys.stdin.read(1)
+                ch = msvcrt.getwch() if os.name == "nt" else sys.stdin.read(1)
 
                 if ch in ("\r", "\n"):
                     current = "".join(buffer) if buffer else (default or "")
@@ -136,10 +147,13 @@ class Logging:
                     interrupted = True
                     break
 
-                elif ch == "\x1b":
+                elif ch == "\x1b" and os.name != "nt":
                     next_ch = sys.stdin.read(1)
                     if next_ch == "[":
                         sys.stdin.read(1)
+
+                elif os.name == "nt" and ch in ("\x00", "\xe0"):
+                    msvcrt.getwch()
 
                 elif ch in ("\x7f", "\x08"):
                     if buffer:
@@ -151,7 +165,8 @@ class Logging:
                     render()
 
         finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            if os.name != "nt":
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
         if interrupted:
             sys.stdout.write("\n")
@@ -168,7 +183,12 @@ class Logging:
 
         if self.filepath:
             with open(self.filepath, "a") as f:
-                fcntl.flock(f, fcntl.LOCK_EX)
+                if os.name == "nt":
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+                    f.seek(0, os.SEEK_END)
+                else:
+                    fcntl.flock(f, fcntl.LOCK_EX)
                 f.write(f"{strip_ansi(line)}{value}\n")
 
         last_process = self.process_name
