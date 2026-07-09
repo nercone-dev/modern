@@ -1,17 +1,18 @@
 import sys
 import shutil
 import threading
+from typing import Optional, Union, List
 from strip_ansi import strip_ansi
 
 from .color import Color
 
 lock = threading.Lock()
-progress_bars: list["ProgressBar"] = []
+progress_bars: List["ProgressBar"] = []
 max_total_width = 0
 
 class ProgressBar:
-    def __init__(self, process_name: str, total: int, current: int = 0, start: bool = True, bar_length: int | None = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: str | Color = "blue", secondary_color: str | Color = "grey"):
-        self.process_name = process_name
+    def __init__(self, name: str, total: int, current: int = 0, start: bool = True, bar_length: Optional[int] = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: Union[str, Color] = "blue", secondary_color: Union[str, Color] = "grey"):
+        self.name = name
         self.total = total
         self.current = current
         self.bar_length = bar_length
@@ -86,9 +87,9 @@ class ProgressBar:
     def suffix(self):
         global progress_bars
 
-        def build_parts(bar: ProgressBar) -> list[str]:
+        def build_parts(bar: ProgressBar) -> List[str]:
             return [
-                f"{bar.primary_color}{bar.process_name}{Color('reset')}",
+                f"{bar.primary_color}{bar.name}{Color('reset')}",
                 f"{bar.secondary_color}{'DONE' if bar.completed else f'{int((bar.current / bar.total) * 100)}%':>4}{Color('reset')}",
                 f"{bar.secondary_color}({bar.current:>{max_total_width}}/{bar.total:>{max_total_width}}){Color('reset')}" if not bar.completed else '',
                 bar.message

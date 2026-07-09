@@ -19,7 +19,7 @@ class Color:
         return Color(str(self) + str(other))
 
     @staticmethod
-    def from_code(color_code: int | str = 0) -> "Color":
+    def from_code(color_code: Union[int, str] = 0) -> "Color":
         return Color(f"\033[{color_code}m")
 
     @staticmethod

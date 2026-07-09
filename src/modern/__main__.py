@@ -8,12 +8,12 @@ def demo_color():
     print("── Color ──")
     line = Text()
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
-        line += Text(f" {name} ", forground_color=name) + " "
+        line += Text(f" {name} ", forground=name) + " "
     print(line)
 
     line = Text()
     for name in ["red", "green", "yellow", "blue", "magenta", "cyan"]:
-        line += Text(f" {name} ", forground_color="white", background_color=name) + " "
+        line += Text(f" {name} ", forground="white", background=name) + " "
     print(line)
 
 def demo_text():
@@ -28,18 +28,24 @@ def demo_logging():
     print("\n── Logging ──")
     main = Logging("Main", primary_color="cyan",  display_level=LoggingLevel.DEBUG)
     sub  = Logging("Sub",  primary_color="green", display_level=LoggingLevel.DEBUG)
-    main.log("Main #0", level=LoggingLevel.INFO)
+
+    main.info("Main #0")
     time.sleep(1)
-    main.log("Main #1", level=LoggingLevel.WARNING)
-    sub.log("Sub #0", level=LoggingLevel.INFO)
+
+    main.warning("Main #1")
+    sub.info("Sub #0")
     time.sleep(2)
-    main.log("Main #2", level=LoggingLevel.INFO)
+
+    main.info("Main #2")
     time.sleep(1)
-    main.log("Main #3", level=LoggingLevel.ERROR)
-    sub.log("Sub #1", level=LoggingLevel.CRITICAL)
+
+    main.error("Main #3")
+    sub.critical("Sub #1")
     time.sleep(2)
-    main.log("Main #4", level=LoggingLevel.CRITICAL)
+
+    main.critical("Main #4")
     time.sleep(1)
+
     if main.prompt("Continue?", default="Y", choices=["Y", "n"]) == "n":
         exit(0)
 

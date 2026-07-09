@@ -4,8 +4,9 @@ import tty
 import fcntl
 import termios
 from enum import Enum
-from strip_ansi import strip_ansi
+from typing import Optional, Union, List
 from datetime import datetime, timezone
+from strip_ansi import strip_ansi
 
 from .color import Color
 
@@ -29,7 +30,7 @@ class LoggingLevel(Enum):
         return list(LoggingLevel).index(a) >= list(LoggingLevel).index(b)
 
 class Logging:
-    def __init__(self, process_name: str, primary_color: str | Color = "cyan", display_level: LoggingLevel = LoggingLevel.INFO, filepath: str | os.PathLike | None = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
+    def __init__(self, process_name: str, primary_color: Union[str, Color] = "cyan", display_level: LoggingLevel = LoggingLevel.INFO, filepath: Optional[Union[str, os.PathLike]] = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
         self.process_name = process_name
         self.primary_color = Color(primary_color)
         self.display_level = display_level
@@ -73,7 +74,7 @@ class Logging:
     def critical(self, content: str = ""):
         self.log(content, level=LoggingLevel.CRITICAL)
 
-    def prompt(self, content: str = "", *, level: LoggingLevel = LoggingLevel.INFO, default: str | None = None, choices: list[str] | None = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: str | None = None) -> str:
+    def prompt(self, content: str = "", *, level: LoggingLevel = LoggingLevel.INFO, default: Optional[str] = None, choices: Optional[List[str]] = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: Optional[str] = None) -> str:
         global last_process
 
         display_content = content
@@ -84,13 +85,15 @@ class Logging:
 
         line = self.format(content=display_content, level=level)
 
-        buffer: list[str] = []
+        buffer: List[str] = []
 
         def render():
             sys.stdout.write("\r\033[K")
             sys.stdout.write(line)
             if not buffer and default is not None:
                 sys.stdout.write(f"{Color('gray')}{default}{Color('reset')}")
+                if default:
+                    sys.stdout.write(f"\033[{len(default)}D")
             else:
                 sys.stdout.write("".join(buffer))
             sys.stdout.flush()
@@ -197,4 +200,4 @@ class Logging:
 
         last_timestamp = timestamp
 
-        return f"{prefix}{('\n' + (' ' * len(strip_ansi(prefix)))).join(content.split('\n'))}"
+        return prefix + ('\n' + (' ' * len(strip_ansi(prefix)))).join(content.split('\n'))
