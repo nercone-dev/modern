@@ -1,16 +1,13 @@
-import sys
-import shutil
-import threading
 from typing import Optional, Union, List
 from strip_ansi import strip_ansi
 
 from .color import Color
+from .terminal import Terminal, TerminalRegion
 
-lock = threading.Lock()
 progress_bars: List["ProgressBar"] = []
 max_total_width = 0
 
-class ProgressBar:
+class ProgressBar(TerminalRegion):
     def __init__(self, name: str, total: int, current: int = 0, start: bool = True, bar_length: Optional[int] = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: Union[str, Color] = "blue", secondary_color: Union[str, Color] = "grey"):
         self.name = name
         self.total = total
@@ -38,46 +35,24 @@ class ProgressBar:
         global progress_bars
         if self.active:
             return
-        with lock:
-            self.active = True
-            progress_bars.append(self)
-            sys.stdout.write(self.format() + "\n")
-            sys.stdout.flush()
+        self.active = True
+        progress_bars.append(self)
+        Terminal.attach(self)
 
     def update(self, amount: int = 1):
         self.current += amount
         if self.current > self.total:
             self.current = self.total
-        self.render()
+        Terminal.update(self)
 
     def finish(self):
-        global progress_bars
-        self.current = self.total
         self.active = False
-        self.render()
+        self.current = self.total
+        Terminal.redraw()
 
-        for bar in progress_bars:
-            bar.render()
-
-    def render(self):
-        global progress_bars
-        with lock:
-            if self not in progress_bars:
-                return
-
-            idx = progress_bars.index(self)
-            lines_up = len(progress_bars) - idx
-
-            sys.stdout.write(f"\033[{lines_up}A")
-            sys.stdout.write("\r\033[K")
-            sys.stdout.write(self.format())
-            sys.stdout.write(f"\033[{lines_up}B")
-            sys.stdout.write("\r")
-            sys.stdout.flush()
-
-    def format(self):
+    def render(self) -> str:
         suffix = self.suffix()
-        bar = self.bar(self.bar_length or (shutil.get_terminal_size((len(strip_ansi(suffix)) + 31, 1)).columns - len(strip_ansi(suffix)) - 1))
+        bar = self.bar(self.bar_length or (Terminal.width() - len(strip_ansi(suffix)) - 1))
         return f"{bar} {suffix}{Color('reset')}"
 
     def bar(self, length: int):

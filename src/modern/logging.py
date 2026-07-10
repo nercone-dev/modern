@@ -13,6 +13,7 @@ else:
     import termios
 
 from .color import Color
+from .terminal import Terminal
 
 last_process = None
 last_timestamp = None
@@ -54,7 +55,7 @@ class Logging:
             return
 
         line = self.format(content=content, level=level)
-        print(line)
+        Terminal.write_line(line)
 
         last_process = self.process_name
 
@@ -97,15 +98,20 @@ class Logging:
         buffer: List[str] = []
 
         def render():
-            sys.stdout.write("\r\033[K")
-            sys.stdout.write(line)
+            stream = Terminal.stream()
+            stream.write("\r\033[K")
+            stream.write(line)
+
             if not buffer and default is not None:
-                sys.stdout.write(f"{Color('gray')}{default}{Color('reset')}")
+                stream.write(f"{Color('gray')}{default}{Color('reset')}")
+
                 if default:
-                    sys.stdout.write(f"\033[{len(default)}D")
+                    stream.write(f"\033[{len(default)}D")
+
             else:
-                sys.stdout.write("".join(buffer))
-            sys.stdout.flush()
+                stream.write("".join(buffer))
+
+            stream.flush()
 
         if os.name != "nt":
             fd = sys.stdin.fileno()
@@ -169,17 +175,17 @@ class Logging:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
         if interrupted:
-            sys.stdout.write("\n")
-            sys.stdout.flush()
+            Terminal.stream().write("\n")
+            Terminal.stream().flush()
             raise KeyboardInterrupt
 
         if not content.endswith(" "):
             content += " "
         line = self.format(content=content, level=level)
 
-        sys.stdout.write("\r\033[K")
-        sys.stdout.write(f"{line}{value}\n")
-        sys.stdout.flush()
+        Terminal.stream().write("\r\033[K")
+        Terminal.stream().write(f"{line}{value}\n")
+        Terminal.stream().flush()
 
         if self.filepath:
             with open(self.filepath, "a") as f:
