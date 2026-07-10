@@ -92,6 +92,34 @@ class Terminal:
                 proxy = None
 
     @staticmethod
+    def freeze(region: TerminalRegion):
+        with lock:
+            if region not in regions:
+                return
+
+            stream = Terminal.stream()
+            Terminal.erase(sum(heights.values()))
+
+            lines = region.render().split("\n")
+            for line in lines:
+                stream.write(line + "\n")
+
+            regions.remove(region)
+            del heights[region]
+
+            Terminal.paint()
+            stream.flush()
+
+            global proxy
+            if not regions and proxy is not None:
+                if proxy.buffer:
+                    stream.write(proxy.buffer)
+                    proxy.buffer = ""
+                    stream.flush()
+                sys.stdout = Terminal.stream()
+                proxy = None
+
+    @staticmethod
     def redraw(region: Optional[TerminalRegion] = None):
         with lock:
             if region is None:

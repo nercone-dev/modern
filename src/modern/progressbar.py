@@ -49,7 +49,7 @@ class ProgressBar(TerminalRegion):
     def finish(self):
         self.active = False
         self.current = self.total
-        Terminal.redraw()
+        Terminal.freeze(self)
 
     def render(self) -> str:
         suffix = self.suffix()
