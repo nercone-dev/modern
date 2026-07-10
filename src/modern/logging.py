@@ -88,8 +88,10 @@ class Logging:
         global last_process
 
         display_content = content
+
         if choices and show_choices:
             display_content += f" [{'/'.join(choices)}]"
+
         if not display_content.endswith(" "):
             display_content += " "
 
@@ -116,6 +118,7 @@ class Logging:
         if os.name != "nt":
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
+
         value = default or ""
         interrupted = False
 

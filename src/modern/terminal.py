@@ -92,10 +92,17 @@ class Terminal:
                 proxy = None
 
     @staticmethod
-    def update(region: TerminalRegion):
+    def redraw(region: Optional[TerminalRegion] = None):
         with lock:
+            if region is None:
+                Terminal.erase(sum(heights.values()))
+                Terminal.paint()
+                Terminal.stream().flush()
+                return
+
             if region not in regions:
                 return
+
             lines = region.render().split("\n")
 
             if len(lines) != heights[region]:
@@ -112,13 +119,6 @@ class Terminal:
             if below:
                 stream.write(f"\033[{below}B\r")
             stream.flush()
-
-    @staticmethod
-    def redraw():
-        with lock:
-            Terminal.erase(sum(heights.values()))
-            Terminal.paint()
-            Terminal.stream().flush()
 
     @staticmethod
     def write(content: str = ""):
@@ -139,12 +139,6 @@ class Terminal:
             Terminal.stream().flush()
 
     @staticmethod
-    def erase(count: int):
-        if not count:
-            return
-        Terminal.stream().write(f"\033[{count}A\r\033[J")
-
-    @staticmethod
     def paint():
         stream = Terminal.stream()
         for region in regions:
@@ -152,3 +146,9 @@ class Terminal:
             for line in lines:
                 stream.write(line + "\n")
             heights[region] = len(lines)
+
+    @staticmethod
+    def erase(count: int):
+        if not count:
+            return
+        Terminal.stream().write(f"\033[{count}A\r\033[J")

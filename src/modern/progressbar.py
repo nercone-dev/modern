@@ -30,6 +30,7 @@ class ProgressBar(TerminalRegion):
 
     def set_message(self, message: str = ""):
         self.message = message
+        Terminal.redraw(self)
 
     def start(self):
         global progress_bars
@@ -43,7 +44,7 @@ class ProgressBar(TerminalRegion):
         self.current += amount
         if self.current > self.total:
             self.current = self.total
-        Terminal.update(self)
+        Terminal.redraw(self)
 
     def finish(self):
         self.active = False
