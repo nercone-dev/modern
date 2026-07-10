@@ -2,9 +2,10 @@ import os
 import sys
 import shutil
 import threading
-from typing import Dict, List, Optional, TextIO
+from typing import Dict, Iterable, List, Optional, TextIO
 
 lock = threading.RLock()
+
 regions: List["TerminalRegion"] = []
 heights: Dict["TerminalRegion", int] = {}
 
@@ -70,78 +71,58 @@ class Terminal:
         return region
 
     @staticmethod
-    def detach(region: TerminalRegion):
-        with lock:
-            if region not in regions:
-                return
-
-            erased = sum(heights.values())
-            regions.remove(region)
-            del heights[region]
-            Terminal.erase(erased)
-            Terminal.paint()
-            Terminal.stream().flush()
-
-            global proxy
-            if not regions and proxy is not None:
-                if proxy.buffer:
-                    Terminal.stream().write(proxy.buffer)
-                    proxy.buffer = ""
-                    Terminal.stream().flush()
-                sys.stdout = Terminal.stream()
-                proxy = None
+    def detach(*targets: TerminalRegion):
+        Terminal.flush(targets, emit=False)
 
     @staticmethod
-    def freeze(region: TerminalRegion):
+    def freeze(*targets: TerminalRegion):
+        Terminal.flush(targets, emit=True)
+
+    @staticmethod
+    def flush(targets: Iterable[TerminalRegion], emit: bool):
         with lock:
-            if region not in regions:
+            leaving = [region for region in regions if region in set(targets)]
+            if not leaving:
                 return
 
             stream = Terminal.stream()
             Terminal.erase(sum(heights.values()))
 
-            lines = region.render().split("\n")
-            for line in lines:
-                stream.write(line + "\n")
-
-            regions.remove(region)
-            del heights[region]
+            for region in list(regions):
+                if region in leaving:
+                    if emit:
+                        for line in region.render().split("\n"):
+                            stream.write(line + "\n")
+                    regions.remove(region)
+                    del heights[region]
 
             Terminal.paint()
             stream.flush()
-
-            global proxy
-            if not regions and proxy is not None:
-                if proxy.buffer:
-                    stream.write(proxy.buffer)
-                    proxy.buffer = ""
-                    stream.flush()
-                sys.stdout = Terminal.stream()
-                proxy = None
+            Terminal.settle()
 
     @staticmethod
-    def redraw(region: Optional[TerminalRegion] = None):
+    def redraw(target: Optional[TerminalRegion] = None):
         with lock:
-            if region is None:
+            if target is None:
                 Terminal.erase(sum(heights.values()))
                 Terminal.paint()
                 Terminal.stream().flush()
                 return
 
-            if region not in regions:
+            if target not in regions:
                 return
 
-            lines = region.render().split("\n")
+            lines = target.render().split("\n")
 
-            if len(lines) != heights[region]:
+            if len(lines) != heights[target]:
                 Terminal.redraw()
                 return
 
             stream = Terminal.stream()
-            idx = regions.index(region)
+            idx = regions.index(target)
             below = sum(heights[sibling] for sibling in regions[idx + 1:])
 
-            stream.write(f"\033[{heights[region] + below}A\r")
+            stream.write(f"\033[{heights[target] + below}A\r")
             for line in lines:
                 stream.write(f"\033[K{line}\n")
             if below:
@@ -180,3 +161,15 @@ class Terminal:
         if not count:
             return
         Terminal.stream().write(f"\033[{count}A\r\033[J")
+
+    @staticmethod
+    def settle():
+        global proxy
+        if regions or proxy is None:
+            return
+        if proxy.buffer:
+            Terminal.stream().write(proxy.buffer)
+            proxy.buffer = ""
+            Terminal.stream().flush()
+        sys.stdout = Terminal.stream()
+        proxy = None

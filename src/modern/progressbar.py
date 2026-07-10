@@ -47,9 +47,16 @@ class ProgressBar(TerminalRegion):
         Terminal.redraw(self)
 
     def finish(self):
+        global progress_bars, max_total_width
         self.active = False
         self.current = self.total
-        Terminal.freeze(self)
+        if self not in progress_bars:
+            return
+        Terminal.redraw(self)
+        if all(bar.completed for bar in progress_bars):
+            Terminal.freeze(*progress_bars)
+            progress_bars = []
+            max_total_width = 0
 
     def render(self) -> str:
         suffix = self.suffix()
