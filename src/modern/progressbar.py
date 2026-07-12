@@ -152,7 +152,7 @@ class ProgressBar(TerminalRegion):
             rendered = part.render(self)
             suffix.append(rendered + " " * (width - len(strip_ansi(rendered))))
 
-        return " ".join(prefix + [self.bar(self.bar_length or (Terminal.width() - (len(strip_ansi(" ".join(prefix + suffix))) + 2)))] + suffix)
+        return " ".join(prefix + [self.bar(self.bar_length or (Terminal.width() - (len(strip_ansi(" ".join(prefix + suffix))) + 1)))] + suffix)
 
     def bar(self, length: int):
         filled_length = int(length * (self.current / self.total))
