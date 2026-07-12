@@ -10,9 +10,6 @@ class ProgressBarPart:
     def __init__(self):
         pass
 
-    def __str__(self) -> str:
-        return self.render()
-
     def render(self, bar: "ProgressBar") -> str:
         return "DEFAULT"
 
