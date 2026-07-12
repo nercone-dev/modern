@@ -1,14 +1,53 @@
-from typing import Optional, Union, List
+from typing import Optional, Any, Union, List, Dict
 from strip_ansi import strip_ansi
 
 from .color import Color
 from .terminal import Terminal, TerminalRegion
 
 progress_bars: List["ProgressBar"] = []
-max_total_width = 0
+
+class ProgressBarPart:
+    def __init__(self):
+        pass
+
+    def __str__(self) -> str:
+        return self.render()
+
+    def render(self, bar: "ProgressBar") -> str:
+        return "DEFAULT"
+
+class TextPart(ProgressBarPart):
+    def __init__(self, text: str, color: Color = Color("default")):
+        self.text = text
+        self.color = color
+
+    def render(self, bar: "ProgressBar") -> str:
+        return str(self.color) + self.text + str(Color("reset"))
+
+class NamePart(ProgressBarPart):
+    def render(self, bar: "ProgressBar") -> str:
+        return str(bar.primary_color) + bar.name + str(Color("reset"))
+
+class PercentagePart(ProgressBarPart):
+    def render(self, bar: "ProgressBar") -> str:
+        if bar.completed:
+            return str(bar.secondary_color) + "DONE" + str(Color("reset"))
+        else:
+            return str(bar.secondary_color) + str(int((bar.current / bar.total) * 100)).rjust(3) + "%" + str(Color("reset"))
+
+class ProgressPart(ProgressBarPart):
+    def render(self, bar: "ProgressBar") -> str:
+        if bar.completed:
+            return ""
+        else:
+            return str(bar.secondary_color) + "(" + str(bar.current).rjust(max(len(str(bar.total)) for bar in progress_bars)) + "/" + str(bar.total).rjust(max(len(str(bar.total)) for bar in progress_bars)) + ")" + str(Color("reset"))
+
+class MessagePart(ProgressBarPart):
+    def render(self, bar: "ProgressBar") -> str:
+        return bar.message
 
 class ProgressBar(TerminalRegion):
-    def __init__(self, name: str, total: int, current: int = 0, start: bool = True, bar_length: Optional[int] = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: Union[str, Color] = "blue", secondary_color: Union[str, Color] = "grey"):
+    def __init__(self, name: str, total: int, *, current: int = 0, start: bool = True, prefix: Optional[List[ProgressBarPart]] = None, suffix: Optional[List[ProgressBarPart]] = None, bar_length: Optional[int] = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: Union[str, Color] = "blue", secondary_color: Union[str, Color] = "grey"):
         self.name = name
         self.total = total
         self.current = current
@@ -18,19 +57,19 @@ class ProgressBar(TerminalRegion):
         self.primary_color = Color(primary_color)
         self.secondary_color = Color(secondary_color)
 
+        self.prefix = prefix or []
+        self.suffix = suffix or [NamePart(), PercentagePart(), ProgressPart(), MessagePart()]
+
         self.active = False
         self.step = 0
         self.message = ""
-
-        global max_total_width
-        max_total_width = max(max_total_width, len(str(total)))
 
         if start:
             self.start()
 
     def set_message(self, message: str = ""):
         self.message = message
-        Terminal.redraw(self)
+        Terminal.redraw()
 
     def start(self):
         global progress_bars
@@ -44,42 +83,43 @@ class ProgressBar(TerminalRegion):
         self.current += amount
         if self.current > self.total:
             self.current = self.total
-        Terminal.redraw(self)
+        Terminal.redraw()
 
     def finish(self):
-        global progress_bars, max_total_width
+        global progress_bars
         self.active = False
         self.current = self.total
         if self not in progress_bars:
             return
-        Terminal.redraw(self)
+        Terminal.redraw()
         if all(bar.completed for bar in progress_bars):
             Terminal.freeze(*progress_bars)
             progress_bars = []
-            max_total_width = 0
 
     def render(self) -> str:
-        suffix = self.suffix()
-        bar = self.bar(self.bar_length or (Terminal.width() - len(strip_ansi(suffix)) - 1))
-        return f"{bar} {suffix}{Color('reset')}"
+        global progress_bars
+
+        prefix: List[str] = []
+        for part in self.prefix:
+            if not any(strip_ansi(part.render(bar)).strip() for bar in progress_bars):
+                continue
+            width    = max(len(strip_ansi(part.render(bar))) for bar in progress_bars)
+            rendered = part.render(self)
+            prefix.append(rendered + " " * (width - len(strip_ansi(rendered))))
+
+        suffix: List[str] = []
+        for part in self.suffix:
+            if not any(strip_ansi(part.render(bar)).strip() for bar in progress_bars):
+                continue
+            width    = max(len(strip_ansi(part.render(bar))) for bar in progress_bars)
+            rendered = part.render(self)
+            suffix.append(rendered + " " * (width - len(strip_ansi(rendered))))
+
+        return " ".join(prefix + [self.bar(self.bar_length or (Terminal.width() - (len(strip_ansi(" ".join(prefix + suffix))) + 2)))] + suffix)
 
     def bar(self, length: int):
         filled_length = int(length * (self.current / self.total))
         return f"{self.primary_color}{self.primary_bar * filled_length}{self.secondary_color}{self.secondary_bar * (length - filled_length)}{Color('reset')}"
-
-    def suffix(self):
-        global progress_bars
-
-        def build_parts(bar: ProgressBar) -> List[str]:
-            return [
-                f"{bar.primary_color}{bar.name}{Color('reset')}",
-                f"{bar.secondary_color}{'DONE' if bar.completed else f'{int((bar.current / bar.total) * 100)}%':>4}{Color('reset')}",
-                f"{bar.secondary_color}({bar.current:>{max_total_width}}/{bar.total:>{max_total_width}}){Color('reset')}" if not bar.completed else '',
-                bar.message
-            ]
-
-        parts = [v + " " * (max(len(strip_ansi(build_parts(bar)[i])) for bar in progress_bars) - len(strip_ansi(v))) for i, v in enumerate(build_parts(self)) if not all(strip_ansi(build_parts(bar)[i]).strip() == "" for bar in progress_bars)]
-        return " ".join(parts)
 
     @property
     def completed(self) -> bool:
