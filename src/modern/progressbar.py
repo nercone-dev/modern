@@ -1,3 +1,4 @@
+import time
 from typing import Optional, Any, Union, List, Dict
 from strip_ansi import strip_ansi
 
@@ -43,6 +44,43 @@ class MessagePart(ProgressBarPart):
     def render(self, bar: "ProgressBar") -> str:
         return bar.message
 
+class ETAPart(ProgressBarPart):
+    def __init__(self, weight: float = 0.5, smoothing: float = 0.3):
+        self.weight = weight
+        self.smoothing = smoothing
+
+    def render(self, bar: "ProgressBar") -> str:
+        state = bar.scope.setdefault("eta", {"start_time": time.monotonic(), "last_time": None, "last_current": None, "ema_rate": None})
+
+        now = time.monotonic()
+        if state["last_time"] is not None and state["last_current"] is not None:
+            delta_current = bar.current - state["last_current"]
+            delta_time = now - state["last_time"]
+            if delta_current > 0 and delta_time > 0:
+                rate = delta_current / delta_time
+                state["ema_rate"] = rate if state["ema_rate"] is None else self.smoothing * rate + (1 - self.smoothing) * state["ema_rate"]
+        state["last_time"] = now
+        state["last_current"] = bar.current
+
+        if bar.completed or bar.current <= 0:
+            return ""
+
+        elapsed = now - state["start_time"]
+        if elapsed <= 0:
+            return ""
+
+        remaining = bar.total - bar.current
+        average_eta = remaining / (bar.current / elapsed)
+        ema_eta = remaining / state["ema_rate"] if state["ema_rate"] else average_eta
+        eta = average_eta * self.weight + ema_eta * (1 - self.weight)
+
+        return str(bar.secondary_color) + self.format(eta) + str(Color("reset"))
+
+    def format(self, seconds: float) -> str:
+        seconds = max(0, int(seconds))
+        minutes, seconds = divmod(seconds, 60)
+        return f"{minutes:02}:{seconds:02}"
+
 class ProgressBar(TerminalRegion):
     def __init__(self, name: str, total: int, *, current: int = 0, start: bool = True, prefix: Optional[List[ProgressBarPart]] = None, suffix: Optional[List[ProgressBarPart]] = None, bar_length: Optional[int] = None, primary_bar: str = "━", secondary_bar: str = "━", primary_color: Union[str, Color] = "blue", secondary_color: Union[str, Color] = "grey"):
         self.name = name
@@ -53,6 +91,8 @@ class ProgressBar(TerminalRegion):
         self.secondary_bar = secondary_bar
         self.primary_color = Color(primary_color)
         self.secondary_color = Color(secondary_color)
+
+        self.scope: Dict[str, Any] = {}
 
         self.prefix = prefix or []
         self.suffix = suffix or [NamePart(), PercentagePart(), ProgressPart(), MessagePart()]
