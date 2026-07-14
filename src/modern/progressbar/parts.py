@@ -274,17 +274,12 @@ class AutoETABackend(ETABackend):
             backend.add(time, current)
         self.previous = RateSample(time, current)
 
-    def best_backend(self) -> Optional[ETABackend]:
-        if not self.backends:
-            return None
-        best_index = min(range(len(self.backends)), key=lambda index: self.errors[index])
-        return self.backends[best_index]
-
     def estimate(self, current: int, total: int) -> Optional[float]:
-        backend = self.best_backend()
-        if backend is None:
-            return None
-        return backend.estimate(current, total)
+        for index in sorted(range(len(self.backends)), key=lambda index: self.errors[index]):
+            estimate = self.backends[index].estimate(current, total)
+            if estimate is not None and math.isfinite(estimate):
+                return estimate
+        return None
 
 class ETAPart(main.ProgressBarPart):
     def __init__(self, backend: Optional[ETABackend] = None):
@@ -304,6 +299,6 @@ class ETAPart(main.ProgressBarPart):
 
     @staticmethod
     def format(seconds: float) -> str:
-        seconds = max(0, int(seconds))
+        seconds = max(0, round(seconds))
         minutes, seconds = divmod(seconds, 60)
         return f"{minutes:02}:{seconds:02}"
