@@ -64,7 +64,7 @@ class InstantaneousRateETABackend(ETABackend):
         self.previous = sample
 
     def estimate(self, current: int, total: int) -> Optional[float]:
-        if not self.rate or self.rate <= 0:
+        if not self.rate or not math.isfinite(self.rate) or self.rate <= 0:
             return None
         return (total - current) / self.rate
 
@@ -84,7 +84,7 @@ class EMAETABackend(ETABackend):
         self.previous = sample
 
     def estimate(self, current: int, total: int) -> Optional[float]:
-        if not self.rate or self.rate <= 0:
+        if not self.rate or not math.isfinite(self.rate) or self.rate <= 0:
             return None
         return (total - current) / self.rate
 
@@ -146,7 +146,7 @@ class LinearRegressionETABackend(ETABackend):
 
     def estimate(self, current: int, total: int) -> Optional[float]:
         rate = self.rate()
-        if not rate or rate <= 0:
+        if not rate or not math.isfinite(rate) or rate <= 0:
             return None
         return (total - current) / rate
 
@@ -176,7 +176,7 @@ class HoltLinearETABackend(ETABackend):
         self.trend = self.trend_smoothing * ((self.level - previous_level) / dt) + (1 - self.trend_smoothing) * self.trend
 
     def estimate(self, current: int, total: int) -> Optional[float]:
-        if self.level is None or not self.trend or self.trend <= 0:
+        if self.level is None or not self.trend or not math.isfinite(self.trend) or self.trend <= 0:
             return None
         return (total - self.level) / self.trend
 
@@ -247,7 +247,7 @@ class EnsembleETABackend(ETABackend):
             backend.add(time, current)
 
     def estimate(self, current: int, total: int) -> Optional[float]:
-        estimates = sorted(estimate for backend in self.backends if (estimate := backend.estimate(current, total)) is not None)
+        estimates = sorted(estimate for backend in self.backends if (estimate := backend.estimate(current, total)) is not None and math.isfinite(estimate))
         if not estimates:
             return None
 
@@ -297,7 +297,7 @@ class ETAPart(main.ProgressBarPart):
             return ""
 
         eta = self.backend.estimate(bar.current, bar.total)
-        if eta is None:
+        if eta is None or not math.isfinite(eta):
             return ""
 
         return str(bar.secondary_color) + ETAPart.format(eta) + str(Color("reset"))
