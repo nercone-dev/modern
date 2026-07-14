@@ -37,13 +37,58 @@ class MessagePart(main.ProgressBarPart):
     def render(self, bar: "ProgressBar") -> str:
         return bar.message
 
+class ETABackend:
+    def add(self, time: float, current: int):
+        raise NotImplementedError
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        raise NotImplementedError
+
 class RateSample:
     def __init__(self, time: float, current: int):
         self.time = time
         self.current = current
 
-class RateWindow:
-    def __init__(self, window_size: int, outlier_threshold: float):
+class InstantaneousRateETABackend(ETABackend):
+    def __init__(self):
+        self.previous: Optional[RateSample] = None
+        self.rate: Optional[float] = None
+
+    def add(self, time: float, current: int):
+        sample = RateSample(time, current)
+        if self.previous is not None:
+            dt = sample.time - self.previous.time
+            if dt > 0:
+                self.rate = (sample.current - self.previous.current) / dt
+        self.previous = sample
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        if not self.rate or self.rate <= 0:
+            return None
+        return (total - current) / self.rate
+
+class EMAETABackend(ETABackend):
+    def __init__(self, smoothing: float = 0.3):
+        self.smoothing = smoothing
+        self.previous: Optional[RateSample] = None
+        self.rate: Optional[float] = None
+
+    def add(self, time: float, current: int):
+        sample = RateSample(time, current)
+        if self.previous is not None:
+            dt = sample.time - self.previous.time
+            if dt > 0:
+                instant_rate = (sample.current - self.previous.current) / dt
+                self.rate = instant_rate if self.rate is None else self.smoothing * instant_rate + (1 - self.smoothing) * self.rate
+        self.previous = sample
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        if not self.rate or self.rate <= 0:
+            return None
+        return (total - current) / self.rate
+
+class LinearRegressionETABackend(ETABackend):
+    def __init__(self, window_size: int = 20, outlier_threshold: float = 3.0):
         self.window_size = window_size
         self.outlier_threshold = outlier_threshold
         self.samples: List[RateSample] = []
@@ -98,24 +143,127 @@ class RateWindow:
 
         return covariance / variance
 
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        rate = self.rate()
+        if not rate or rate <= 0:
+            return None
+        return (total - current) / rate
+
+class HoltLinearETABackend(ETABackend):
+    def __init__(self, level_smoothing: float = 0.3, trend_smoothing: float = 0.1):
+        self.level_smoothing = level_smoothing
+        self.trend_smoothing = trend_smoothing
+        self.level: Optional[float] = None
+        self.trend: Optional[float] = None
+        self.previous_time: Optional[float] = None
+
+    def add(self, time: float, current: int):
+        if self.level is None:
+            self.level = float(current)
+            self.trend = 0.0
+            self.previous_time = time
+            return
+
+        dt = time - self.previous_time
+        if dt <= 0:
+            return
+        self.previous_time = time
+
+        previous_level = self.level
+        forecast = self.level + self.trend * dt
+        self.level = self.level_smoothing * current + (1 - self.level_smoothing) * forecast
+        self.trend = self.trend_smoothing * ((self.level - previous_level) / dt) + (1 - self.trend_smoothing) * self.trend
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        if self.level is None or not self.trend or self.trend <= 0:
+            return None
+        return (total - self.level) / self.trend
+
+class KalmanFilterETABackend(ETABackend):
+    def __init__(self, process_variance: float = 1e-2, measurement_variance: float = 1.0):
+        self.process_variance = process_variance
+        self.measurement_variance = measurement_variance
+        self.position: Optional[float] = None
+        self.velocity = 0.0
+        self.previous_time: Optional[float] = None
+        self.position_variance = 1.0
+        self.cross_variance = 0.0
+        self.velocity_variance = 1.0
+
+    def add(self, time: float, current: int):
+        if self.position is None:
+            self.position = float(current)
+            self.previous_time = time
+            return
+
+        dt = time - self.previous_time
+        if dt <= 0:
+            return
+        self.previous_time = time
+
+        predicted_position = self.position + self.velocity * dt
+        predicted_velocity = self.velocity
+
+        predicted_position_variance = self.position_variance + 2 * dt * self.cross_variance + dt * dt * self.velocity_variance + self.process_variance
+        predicted_cross_variance = self.cross_variance + dt * self.velocity_variance
+        predicted_velocity_variance = self.velocity_variance + self.process_variance
+
+        innovation = current - predicted_position
+        innovation_variance = predicted_position_variance + self.measurement_variance
+        if innovation_variance == 0:
+            self.position = predicted_position
+            self.velocity = predicted_velocity
+            self.position_variance = predicted_position_variance
+            self.cross_variance = predicted_cross_variance
+            self.velocity_variance = predicted_velocity_variance
+            return
+
+        position_gain = predicted_position_variance / innovation_variance
+        velocity_gain = predicted_cross_variance / innovation_variance
+
+        self.position = predicted_position + position_gain * innovation
+        self.velocity = predicted_velocity + velocity_gain * innovation
+
+        self.position_variance = (1 - position_gain) * predicted_position_variance
+        self.cross_variance = (1 - position_gain) * predicted_cross_variance
+        self.velocity_variance = predicted_velocity_variance - velocity_gain * predicted_cross_variance
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        if self.position is None or self.velocity <= 0:
+            return None
+        return (total - self.position) / self.velocity
+
+class EnsembleETABackend(ETABackend):
+    def __init__(self, backends: Optional[List[ETABackend]] = None):
+        self.backends = backends or [LinearRegressionETABackend(), EMAETABackend(), HoltLinearETABackend(), KalmanFilterETABackend()]
+
+    def add(self, time: float, current: int):
+        for backend in self.backends:
+            backend.add(time, current)
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        estimates = sorted(estimate for backend in self.backends if (estimate := backend.estimate(current, total)) is not None)
+        if not estimates:
+            return None
+
+        middle = len(estimates) // 2
+        if len(estimates) % 2 == 0:
+            return (estimates[middle - 1] + estimates[middle]) / 2
+        return estimates[middle]
+
 class ETAPart(main.ProgressBarPart):
-    def __init__(self, window_size: int = 20, outlier_threshold: float = 3.0):
-        self.window_size = window_size
-        self.outlier_threshold = outlier_threshold
+    def __init__(self, backend: Optional[ETABackend] = None):
+        self.backend = backend or LinearRegressionETABackend()
 
     def render(self, bar: "ProgressBar") -> str:
-        window: RateWindow = bar.scope.setdefault("eta", RateWindow(self.window_size, self.outlier_threshold))
-        window.add(time.monotonic(), bar.current)
+        self.backend.add(time.monotonic(), bar.current)
 
         if bar.completed or bar.current <= 0:
             return ""
 
-        rate = window.rate()
-        if not rate or rate <= 0:
+        eta = self.backend.estimate(bar.current, bar.total)
+        if eta is None:
             return ""
-
-        remaining = bar.total - bar.current
-        eta = remaining / rate
 
         return str(bar.secondary_color) + ETAPart.format(eta) + str(Color("reset"))
 
