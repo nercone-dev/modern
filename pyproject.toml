@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "nercone-modern"
-version = "5.3.0"
+version = "5.4.0"
 description = "Modern CLI Library"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [ { name = "Nercone", email = "nercone@nercone.dev" } ]

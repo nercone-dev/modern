@@ -251,9 +251,39 @@ class EnsembleETABackend(ETABackend):
             return (estimates[middle - 1] + estimates[middle]) / 2
         return estimates[middle]
 
+class AutoETABackend(ETABackend):
+    def __init__(self, backends: Optional[List[ETABackend]] = None):
+        self.backends = backends or [InstantaneousRateETABackend(), EMAETABackend(), LinearRegressionETABackend(), HoltLinearETABackend(), KalmanFilterETABackend()]
+        self.errors = [0.0] * len(self.backends)
+        self.previous: Optional[RateSample] = None
+
+    def add(self, time: float, current: int):
+        if self.previous is not None:
+            dt = time - self.previous.time
+            if dt > 0:
+                for index, backend in enumerate(self.backends):
+                    predicted = backend.estimate(self.previous.current, current)
+                    if predicted is not None:
+                        self.errors[index] += abs(predicted - dt)
+        for backend in self.backends:
+            backend.add(time, current)
+        self.previous = RateSample(time, current)
+
+    def best_backend(self) -> Optional[ETABackend]:
+        if not self.backends:
+            return None
+        best_index = min(range(len(self.backends)), key=lambda index: self.errors[index])
+        return self.backends[best_index]
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        backend = self.best_backend()
+        if backend is None:
+            return None
+        return backend.estimate(current, total)
+
 class ETAPart(main.ProgressBarPart):
     def __init__(self, backend: Optional[ETABackend] = None):
-        self.backend = backend or LinearRegressionETABackend()
+        self.backend = backend or ETABackend()
 
     def render(self, bar: "ProgressBar") -> str:
         self.backend.add(time.monotonic(), bar.current)
