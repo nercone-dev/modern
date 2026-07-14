@@ -58,7 +58,11 @@ class ETAPart(ProgressBarPart):
             delta_time = now - state["last_time"]
             if delta_current > 0 and delta_time > 0:
                 rate = delta_current / delta_time
-                state["ema_rate"] = rate if state["ema_rate"] is None else self.smoothing * rate + (1 - self.smoothing) * state["ema_rate"]
+                if state["ema_rate"] is None:
+                    state["ema_rate"] = rate
+                else:
+                    alpha = 1 - (1 - self.smoothing) ** delta_time
+                    state["ema_rate"] = alpha * rate + (1 - alpha) * state["ema_rate"]
         state["last_time"] = now
         state["last_current"] = bar.current
 
@@ -98,7 +102,10 @@ class ProgressBar(TerminalRegion):
         self.suffix = suffix or [NamePart(), PercentagePart(), ProgressPart(), MessagePart()]
 
         self.active = False
+        self.frozen = False
+
         self.step = 0
+
         self.message = ""
 
         if start:
@@ -123,16 +130,21 @@ class ProgressBar(TerminalRegion):
         Terminal.redraw()
 
     def finish(self):
-        global progress_bars
+        if self.frozen:
+            return
+
         self.active = False
         self.current = self.total
-        if self not in progress_bars:
+
+        if self.frozen:
             return
+
         Terminal.redraw()
-        if all(bar.completed for bar in progress_bars):
-            frozen = Terminal.freeze(*progress_bars)
-            if frozen:
-                progress_bars = frozen
+
+        live = [bar for bar in progress_bars if not bar.frozen]
+        if all(bar.completed for bar in live):
+            for bar in Terminal.freeze(*live):
+                bar.frozen = True
 
     def render(self) -> str:
         global progress_bars
