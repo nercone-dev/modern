@@ -283,7 +283,7 @@ class AutoETABackend(ETABackend):
 
 class ETAPart(main.ProgressBarPart):
     def __init__(self, backend: Optional[ETABackend] = None):
-        self.backend = backend or ETABackend()
+        self.backend = backend or AutoETABackend()
 
     def render(self, bar: "ProgressBar") -> str:
         self.backend.add(time.monotonic(), bar.current)
