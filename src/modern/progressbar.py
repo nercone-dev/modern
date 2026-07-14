@@ -44,39 +44,69 @@ class MessagePart(ProgressBarPart):
     def render(self, bar: "ProgressBar") -> str:
         return bar.message
 
+class RateEstimator:
+    def __init__(self, process_variance: float, measurement_variance: float):
+        self.process_variance = process_variance
+        self.measurement_variance = measurement_variance
+        self.rate: Optional[float] = None
+        self.trend = 0.0
+        self.rate_variance = measurement_variance
+        self.trend_variance = 1.0
+        self.covariance = 0.0
+
+    def update(self, measured_rate: float, dt: float):
+        if self.rate is None:
+            self.rate = measured_rate
+            return
+
+        predicted_rate = self.rate + self.trend * dt
+        predicted_trend = self.trend
+
+        q = self.process_variance
+        predicted_rate_variance = self.rate_variance + 2 * dt * self.covariance + dt * dt * self.trend_variance + (dt ** 4 / 4) * q
+        predicted_covariance = self.covariance + dt * self.trend_variance + (dt ** 3 / 2) * q
+        predicted_trend_variance = self.trend_variance + dt * dt * q
+
+        innovation = measured_rate - predicted_rate
+        innovation_variance = predicted_rate_variance + self.measurement_variance
+
+        rate_gain = predicted_rate_variance / innovation_variance
+        trend_gain = predicted_covariance / innovation_variance
+
+        self.rate = predicted_rate + rate_gain * innovation
+        self.trend = predicted_trend + trend_gain * innovation
+
+        self.rate_variance = predicted_rate_variance * (1 - rate_gain)
+        self.covariance = predicted_covariance * (1 - rate_gain)
+        self.trend_variance = predicted_trend_variance - trend_gain * predicted_covariance
+
 class ETAPart(ProgressBarPart):
-    def __init__(self, weight: float = 0.5, smoothing: float = 0.3):
-        self.weight = weight
-        self.smoothing = smoothing
+    def __init__(self, process_variance: float = 0.01, measurement_variance: float = 1.0):
+        self.process_variance = process_variance
+        self.measurement_variance = measurement_variance
 
     def render(self, bar: "ProgressBar") -> str:
-        state = bar.scope.setdefault("eta", {"start_time": time.monotonic(), "last_time": None, "last_current": None, "ema_rate": None})
+        state = bar.scope.setdefault("eta", {"last_time": None, "last_current": None, "estimator": RateEstimator(self.process_variance, self.measurement_variance)})
 
         now = time.monotonic()
         if state["last_time"] is not None and state["last_current"] is not None:
             delta_current = bar.current - state["last_current"]
             delta_time = now - state["last_time"]
             if delta_current > 0 and delta_time > 0:
-                rate = delta_current / delta_time
-                if state["ema_rate"] is None:
-                    state["ema_rate"] = rate
-                else:
-                    alpha = 1 - (1 - self.smoothing) ** delta_time
-                    state["ema_rate"] = alpha * rate + (1 - alpha) * state["ema_rate"]
+                measured_rate = delta_current / delta_time
+                state["estimator"].update(measured_rate, delta_time)
         state["last_time"] = now
         state["last_current"] = bar.current
 
         if bar.completed or bar.current <= 0:
             return ""
 
-        elapsed = now - state["start_time"]
-        if elapsed <= 0:
+        rate = state["estimator"].rate
+        if not rate or rate <= 0:
             return ""
 
         remaining = bar.total - bar.current
-        average_eta = remaining / (bar.current / elapsed)
-        ema_eta = remaining / state["ema_rate"] if state["ema_rate"] else average_eta
-        eta = average_eta * self.weight + ema_eta * (1 - self.weight)
+        eta = remaining / rate
 
         return str(bar.secondary_color) + self.format(eta) + str(Color("reset"))
 
