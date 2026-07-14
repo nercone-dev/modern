@@ -8,6 +8,6 @@ from .text import Text
 from .color import Color
 from .logging import Logging, LoggingLevel
 from .terminal import Terminal, TerminalRegion
-from .progressbar import ProgressBar
+from .progressbar import ProgressBar, ProgressBarPart
 
-__all__ = ["Text", "Color", "Logging", "LoggingLevel", "Terminal", "TerminalRegion", "ProgressBar"]
+__all__ = ["Text", "Color", "Logging", "LoggingLevel", "Terminal", "TerminalRegion", "ProgressBar", "ProgressBarPart"]
