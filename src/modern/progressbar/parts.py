@@ -1,3 +1,4 @@
+import math
 import time
 from typing import Optional, List, TYPE_CHECKING
 
@@ -191,8 +192,12 @@ class KalmanFilterETABackend(ETABackend):
         self.velocity_variance = 1.0
 
     def add(self, time: float, current: int):
-        if self.position is None:
+        if self.position is None or not math.isfinite(self.position) or not math.isfinite(self.velocity):
             self.position = float(current)
+            self.velocity = 0.0
+            self.position_variance = 1.0
+            self.cross_variance = 0.0
+            self.velocity_variance = 1.0
             self.previous_time = time
             return
 
@@ -229,7 +234,7 @@ class KalmanFilterETABackend(ETABackend):
         self.velocity_variance = predicted_velocity_variance - velocity_gain * predicted_cross_variance
 
     def estimate(self, current: int, total: int) -> Optional[float]:
-        if self.position is None or self.velocity <= 0:
+        if self.position is None or not math.isfinite(self.velocity) or self.velocity <= 0:
             return None
         return (total - self.position) / self.velocity
 
