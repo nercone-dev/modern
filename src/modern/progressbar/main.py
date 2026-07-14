@@ -13,6 +13,13 @@ class ProgressBarPart:
     def render(self, bar: "ProgressBar") -> str:
         return "DEFAULT"
 
+    def render_once(self, bar: "ProgressBar") -> str:
+        state = (bar.current, bar.total, bar.message, bar.completed)
+        if getattr(self, "rendered_state", None) != state:
+            self.rendered_cache = self.render(bar)
+            self.rendered_state = state
+        return self.rendered_cache
+
 from .parts import NamePart, PercentagePart, ProgressPart, MessagePart
 
 class ProgressBar(TerminalRegion):
@@ -79,21 +86,22 @@ class ProgressBar(TerminalRegion):
     def render(self) -> str:
         global progress_bars
 
-        prefix: List[str] = []
-        for part in self.prefix:
-            if not any(strip_ansi(part.render(bar)).strip() for bar in progress_bars):
-                continue
-            width    = max(len(strip_ansi(part.render(bar))) for bar in progress_bars)
-            rendered = part.render(self)
-            prefix.append(rendered + " " * (width - len(strip_ansi(rendered))))
+        def aligned(attribute: str) -> List[str]:
+            result: List[str] = []
 
-        suffix: List[str] = []
-        for part in self.suffix:
-            if not any(strip_ansi(part.render(bar)).strip() for bar in progress_bars):
-                continue
-            width    = max(len(strip_ansi(part.render(bar))) for bar in progress_bars)
-            rendered = part.render(self)
-            suffix.append(rendered + " " * (width - len(strip_ansi(rendered))))
+            for part in getattr(self, attribute):
+                rendered = {bar: other.render_once(bar) for bar in progress_bars for other in getattr(bar, attribute) if type(other) is type(part)}
+
+                if not any(strip_ansi(value).strip() for value in rendered.values()):
+                    continue
+
+                width = max(len(strip_ansi(value)) for value in rendered.values())
+                result.append(rendered[self] + " " * (width - len(strip_ansi(rendered[self]))))
+
+            return result
+
+        prefix = aligned("prefix")
+        suffix = aligned("suffix")
 
         return " ".join(prefix + [self.bar(self.bar_length or (Terminal.width() - (len(strip_ansi(" ".join(prefix + suffix))) + 1)))] + suffix)
 
