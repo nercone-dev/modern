@@ -75,15 +75,15 @@ class Terminal:
         Terminal.flush(targets, emit=False)
 
     @staticmethod
-    def freeze(*targets: TerminalRegion):
-        Terminal.flush(targets, emit=True)
+    def freeze(*targets: TerminalRegion) -> List[TerminalRegion]:
+        return Terminal.flush(targets, emit=True)
 
     @staticmethod
-    def flush(targets: Iterable[TerminalRegion], emit: bool):
+    def flush(targets: Iterable[TerminalRegion], emit: bool) -> List[TerminalRegion]:
         with lock:
             leaving = [region for region in regions if region in set(targets)]
             if not leaving:
-                return
+                return leaving
 
             stream = Terminal.stream()
             Terminal.erase(sum(heights.values()))
@@ -99,6 +99,8 @@ class Terminal:
             Terminal.paint()
             stream.flush()
             Terminal.settle()
+
+            return leaving
 
     @staticmethod
     def redraw(target: Optional[TerminalRegion] = None):

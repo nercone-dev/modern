@@ -130,8 +130,9 @@ class ProgressBar(TerminalRegion):
             return
         Terminal.redraw()
         if all(bar.completed for bar in progress_bars):
-            Terminal.freeze(*progress_bars)
-            progress_bars = []
+            frozen = Terminal.freeze(*progress_bars)
+            if frozen:
+                progress_bars = frozen
 
     def render(self) -> str:
         global progress_bars
