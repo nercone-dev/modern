@@ -1,8 +1,7 @@
 import os
 import sys
 from enum import Enum
-from typing import Optional, Union, List
-from datetime import datetime, timezone
+from typing import Optional, Any, Union, List, Dict
 from strip_ansi import strip_ansi
 
 if os.name == "nt":
@@ -15,10 +14,7 @@ else:
 from ..color import Color
 from ..terminal import Terminal
 
-last_process = None
-last_timestamp = None
-
-max_process_width = 0
+loggers: List["Logger"] = []
 
 class LogLevel(Enum):
     DEBUG    = "DEBUG"
@@ -27,37 +23,70 @@ class LogLevel(Enum):
     ERROR    = "ERROR"
     CRITICAL = "CRITICAL"
 
+    def __ge__(a: "LogLevel", b: "LogLevel") -> bool:
+        return list(LogLevel).index(a) >= list(LogLevel).index(b)
+
+    def color(self) -> Color:
+        if self is LogLevel.DEBUG:
+            return Color("gray")
+        elif self is LogLevel.INFO:
+            return Color("blue")
+        elif self is LogLevel.WARNING:
+            return Color("yellow")
+        elif self is LogLevel.ERROR:
+            return Color("red")
+        elif self is LogLevel.CRITICAL:
+            return Color("red", background=True) + Color("white")
+        else:
+            return Color("gray")
+
     @staticmethod
     def max_width() -> int:
         return max((len(level.value) for level in list(LogLevel)))
 
-    def __ge__(a: "LogLevel", b: "LogLevel") -> bool:
-        return list(LogLevel).index(a) >= list(LogLevel).index(b)
+class LoggerPart:
+    def __init__(self):
+        pass
+
+    def render(self, logger: "Logger") -> str:
+        return "DEFAULT"
+
+    def on_log(self, logger: "Logger"):
+        pass
+
+    def on_prompt(self, logger: "Logger"):
+        pass
+
+from .parts import TimestampPart, NamePart, LevelPart
 
 class Logger:
-    def __init__(self, process_name: str, primary_color: Union[str, Color] = "cyan", display_level: LogLevel = LogLevel.INFO, filepath: Optional[Union[str, os.PathLike]] = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
+    def __init__(self, process_name: str, *, prefix: Optional[List[LoggerPart]] = None, suffix: Optional[List[LoggerPart]] = None, primary_color: Union[str, Color] = "cyan", display_level: LogLevel = LogLevel.INFO, filepath: Optional[Union[str, os.PathLike]] = None):
+        global loggers
+
         self.process_name = process_name
         self.primary_color = Color(primary_color)
         self.display_level = display_level
         self.filepath = filepath
 
-        self.show_process_name = show_process_name
-        self.show_level = show_level
-        self.show_timestamp = show_timestamp
+        self.scope: Dict[str, Any] = {}
 
-        global max_process_width
-        max_process_width = max(max_process_width, len(process_name))
+        self.prefix = prefix or [TimestampPart(), NamePart(), LevelPart()]
+        self.suffix = suffix or []
+
+        self.level = display_level
+        self.content = ""
+
+        loggers.append(self)
 
     def log(self, content: str = "", *, level: LogLevel = LogLevel.INFO):
-        global last_process
-
         if not level >= self.display_level:
             return
 
+        for part in self.prefix + self.suffix:
+            part.on_log(self)
+
         line = self.format(content=content, level=level)
         Terminal.write_line(line)
-
-        last_process = self.process_name
 
         if self.filepath:
             with open(self.filepath, "a") as f:
@@ -85,8 +114,6 @@ class Logger:
         self.log(content, level=LogLevel.CRITICAL)
 
     def prompt(self, content: str = "", *, level: LogLevel = LogLevel.INFO, default: Optional[str] = None, choices: Optional[List[str]] = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: Optional[str] = None) -> str:
-        global last_process
-
         display_content = content
 
         if choices and show_choices:
@@ -95,23 +122,24 @@ class Logger:
         if not display_content.endswith(" "):
             display_content += " "
 
-        line = self.format(content=display_content, level=level)
+        for part in self.prefix + self.suffix:
+            part.on_prompt(self)
 
         buffer: List[str] = []
 
         def render():
             stream = Terminal.stream()
-            stream.write("\r\033[K")
-            stream.write(line)
 
             if not buffer and default is not None:
-                stream.write(f"{Color('gray')}{default}{Color('reset')}")
-
-                if default:
-                    stream.write(f"\033[{len(default)}D")
-
+                text = f"{Color('gray')}{default}{Color('reset')}"
             else:
-                stream.write("".join(buffer))
+                text = "".join(buffer)
+
+            stream.write("\r\033[K")
+            stream.write(self.format(content=display_content + text, level=level, back=True))
+
+            if not buffer and default:
+                stream.write(f"\033[{len(default)}D")
 
             stream.flush()
 
@@ -184,10 +212,10 @@ class Logger:
 
         if not content.endswith(" "):
             content += " "
-        line = self.format(content=content, level=level)
+        line = self.format(content=content + value, level=level)
 
         Terminal.stream().write("\r\033[K")
-        Terminal.stream().write(f"{line}{value}\n")
+        Terminal.stream().write(f"{line}\n")
         Terminal.stream().flush()
 
         if self.filepath:
@@ -198,35 +226,49 @@ class Logger:
                     f.seek(0, os.SEEK_END)
                 else:
                     fcntl.flock(f, fcntl.LOCK_EX)
-                f.write(f"{strip_ansi(line)}{value}\n")
-
-        last_process = self.process_name
+                f.write(f"{strip_ansi(line)}\n")
 
         return value
 
-    def format(self, content: str = "", level: LogLevel = LogLevel.INFO) -> str:
-        global max_process_width, last_process, last_timestamp
+    def format(self, content: str = "", level: LogLevel = LogLevel.INFO, back: bool = False) -> str:
+        global loggers
 
-        if level == LogLevel.DEBUG:
-            level_color = Color("gray")
-        elif level == LogLevel.INFO:
-            level_color = Color("blue")
-        elif level == LogLevel.WARNING:
-            level_color = Color("yellow")
-        elif level == LogLevel.ERROR:
-            level_color = Color("red")
-        elif level == LogLevel.CRITICAL:
-            level_color = Color("red", background=True) + Color("white")
-        else:
-            level_color = Color("gray")
+        self.content = content
+        self.level = level
 
-        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        def columns(attribute: str) -> List[type]:
+            result: List[type] = []
 
-        prefix_process_name = f"{self.primary_color}{' ' * max_process_width if self.process_name == last_process else self.process_name.ljust(max_process_width)}{Color('reset')}"
-        prefix_level        = f"{level_color}{level.value.ljust(LogLevel.max_width())}{Color('reset')}"
-        prefix_timestamp    = f"{Color('gray')}{' ' * len(timestamp) if timestamp == last_timestamp else timestamp}{Color('reset')}"
-        prefix              = f"{prefix_timestamp + ' ' if self.show_timestamp else ''}{prefix_process_name + ' ' if self.show_process_name else ''}{prefix_level + ' ' if self.show_level else ''}"
+            for logger in loggers:
+                index = 0
+                for part in getattr(logger, attribute):
+                    if type(part) in result:
+                        index = result.index(type(part)) + 1
+                    else:
+                        result.insert(index, type(part))
+                        index += 1
 
-        last_timestamp = timestamp
+            return result
 
-        return prefix + ('\n' + (' ' * len(strip_ansi(prefix)))).join(content.split('\n'))
+        def aligned(attribute: str) -> List[str]:
+            result: List[str] = []
+
+            for column in columns(attribute):
+                rendered = {logger: other.render(logger) for logger in loggers for other in getattr(logger, attribute) if type(other) is column}
+
+                if not any(strip_ansi(value).strip() for value in rendered.values()):
+                    continue
+
+                own = rendered.get(self, "")
+                width = max(len(strip_ansi(value)) for value in rendered.values())
+                result.append(own + " " * (width - len(strip_ansi(own))))
+
+            return result
+
+        prefix = aligned("prefix")
+        suffix = aligned("suffix")
+
+        content = ('\n' + (' ' * len(strip_ansi(" ".join(prefix))))).join(content.split('\n'))
+        padding = " " * (Terminal.width() - (len(strip_ansi(" ".join(prefix))) + len(strip_ansi(content.split('\n')[-1])) + len(strip_ansi(" ".join(suffix))) + 3))
+
+        return " ".join(prefix + [content] + ([padding] if suffix else []) + suffix) + (f"\033[{len(strip_ansi(' '.join([padding] + suffix)))}D" if back and suffix else "")

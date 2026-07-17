@@ -6,8 +6,8 @@ if os.name == "nt":
 
 from .text import Text
 from .color import Color
-from .logger import Logger, LogLevel
+from .logger import Logger, LoggerPart, LogLevel
 from .terminal import Terminal, TerminalRegion
 from .progressbar import ProgressBar, ProgressBarPart
 
-__all__ = ["Text", "Color", "Logger", "LogLevel", "Terminal", "TerminalRegion", "ProgressBar", "ProgressBarPart"]
+__all__ = ["Text", "Color", "Logger", "LoggerPart", "LogLevel", "Terminal", "TerminalRegion", "ProgressBar", "ProgressBarPart"]
