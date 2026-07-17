@@ -4,7 +4,7 @@ requires-python = ">=3.8"
 
 [[package]]
 name = "nercone-modern"
-version = "5.4.5"
+version = "6.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "strip-ansi" },
