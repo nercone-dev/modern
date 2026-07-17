@@ -13,12 +13,8 @@ class ProgressBarPart:
     def render(self, bar: "ProgressBar") -> str:
         return "DEFAULT"
 
-    def render_once(self, bar: "ProgressBar") -> str:
-        state = (bar.current, bar.total, bar.message, bar.completed)
-        if getattr(self, "rendered_state", None) != state:
-            self.rendered_cache = self.render(bar)
-            self.rendered_state = state
-        return self.rendered_cache
+    def on_update(self, bar: "ProgressBar"):
+        pass
 
 from .parts import NamePart, PercentagePart, ProgressPart, MessagePart
 
@@ -64,6 +60,8 @@ class ProgressBar(TerminalRegion):
         self.current += amount
         if self.current > self.total:
             self.current = self.total
+        for part in self.prefix + self.suffix:
+            part.on_update(self)
         Terminal.redraw()
 
     def finish(self):
@@ -86,17 +84,32 @@ class ProgressBar(TerminalRegion):
     def render(self) -> str:
         global progress_bars
 
+        def columns(attribute: str) -> List[type]:
+            result: List[type] = []
+
+            for bar in progress_bars:
+                index = 0
+                for part in getattr(bar, attribute):
+                    if type(part) in result:
+                        index = result.index(type(part)) + 1
+                    else:
+                        result.insert(index, type(part))
+                        index += 1
+
+            return result
+
         def aligned(attribute: str) -> List[str]:
             result: List[str] = []
 
-            for part in getattr(self, attribute):
-                rendered = {bar: other.render_once(bar) for bar in progress_bars for other in getattr(bar, attribute) if type(other) is type(part)}
+            for column in columns(attribute):
+                rendered = {bar: other.render(bar) for bar in progress_bars for other in getattr(bar, attribute) if type(other) is column}
 
                 if not any(strip_ansi(value).strip() for value in rendered.values()):
                     continue
 
+                own = rendered.get(self, "")
                 width = max(len(strip_ansi(value)) for value in rendered.values())
-                result.append(rendered[self] + " " * (width - len(strip_ansi(rendered[self]))))
+                result.append(own + " " * (width - len(strip_ansi(own))))
 
             return result
 

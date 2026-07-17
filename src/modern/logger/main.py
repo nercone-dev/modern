@@ -12,15 +12,15 @@ else:
     import fcntl
     import termios
 
-from .color import Color
-from .terminal import Terminal
+from ..color import Color
+from ..terminal import Terminal
 
 last_process = None
 last_timestamp = None
 
 max_process_width = 0
 
-class LoggingLevel(Enum):
+class LogLevel(Enum):
     DEBUG    = "DEBUG"
     INFO     = "INFO"
     WARNING  = "WARNING"
@@ -29,13 +29,13 @@ class LoggingLevel(Enum):
 
     @staticmethod
     def max_width() -> int:
-        return max((len(level.value) for level in list(LoggingLevel)))
+        return max((len(level.value) for level in list(LogLevel)))
 
-    def __ge__(a: "LoggingLevel", b: "LoggingLevel") -> bool:
-        return list(LoggingLevel).index(a) >= list(LoggingLevel).index(b)
+    def __ge__(a: "LogLevel", b: "LogLevel") -> bool:
+        return list(LogLevel).index(a) >= list(LogLevel).index(b)
 
-class Logging:
-    def __init__(self, process_name: str, primary_color: Union[str, Color] = "cyan", display_level: LoggingLevel = LoggingLevel.INFO, filepath: Optional[Union[str, os.PathLike]] = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
+class Logger:
+    def __init__(self, process_name: str, primary_color: Union[str, Color] = "cyan", display_level: LogLevel = LogLevel.INFO, filepath: Optional[Union[str, os.PathLike]] = None, show_process_name: bool = True, show_level: bool = True, show_timestamp: bool = True):
         self.process_name = process_name
         self.primary_color = Color(primary_color)
         self.display_level = display_level
@@ -48,7 +48,7 @@ class Logging:
         global max_process_width
         max_process_width = max(max_process_width, len(process_name))
 
-    def log(self, content: str = "", *, level: LoggingLevel = LoggingLevel.INFO):
+    def log(self, content: str = "", *, level: LogLevel = LogLevel.INFO):
         global last_process
 
         if not level >= self.display_level:
@@ -70,21 +70,21 @@ class Logging:
                 f.write(f"{strip_ansi(line)}\n")
 
     def debug(self, content: str = ""):
-        self.log(content, level=LoggingLevel.DEBUG)
+        self.log(content, level=LogLevel.DEBUG)
 
     def info(self, content: str = ""):
-        self.log(content, level=LoggingLevel.INFO)
+        self.log(content, level=LogLevel.INFO)
 
     def warning(self, content: str = ""):
-        self.log(content, level=LoggingLevel.WARNING)
+        self.log(content, level=LogLevel.WARNING)
 
     def error(self, content: str = ""):
-        self.log(content, level=LoggingLevel.ERROR)
+        self.log(content, level=LogLevel.ERROR)
 
     def critical(self, content: str = ""):
-        self.log(content, level=LoggingLevel.CRITICAL)
+        self.log(content, level=LogLevel.CRITICAL)
 
-    def prompt(self, content: str = "", *, level: LoggingLevel = LoggingLevel.INFO, default: Optional[str] = None, choices: Optional[List[str]] = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: Optional[str] = None) -> str:
+    def prompt(self, content: str = "", *, level: LogLevel = LogLevel.INFO, default: Optional[str] = None, choices: Optional[List[str]] = None, show_choices: bool = True, interrupt_ignore: bool = False, interrupt_default: Optional[str] = None) -> str:
         global last_process
 
         display_content = content
@@ -204,18 +204,18 @@ class Logging:
 
         return value
 
-    def format(self, content: str = "", level: LoggingLevel = LoggingLevel.INFO) -> str:
+    def format(self, content: str = "", level: LogLevel = LogLevel.INFO) -> str:
         global max_process_width, last_process, last_timestamp
 
-        if level == LoggingLevel.DEBUG:
+        if level == LogLevel.DEBUG:
             level_color = Color("gray")
-        elif level == LoggingLevel.INFO:
+        elif level == LogLevel.INFO:
             level_color = Color("blue")
-        elif level == LoggingLevel.WARNING:
+        elif level == LogLevel.WARNING:
             level_color = Color("yellow")
-        elif level == LoggingLevel.ERROR:
+        elif level == LogLevel.ERROR:
             level_color = Color("red")
-        elif level == LoggingLevel.CRITICAL:
+        elif level == LogLevel.CRITICAL:
             level_color = Color("red", background=True) + Color("white")
         else:
             level_color = Color("gray")
@@ -223,7 +223,7 @@ class Logging:
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
         prefix_process_name = f"{self.primary_color}{' ' * max_process_width if self.process_name == last_process else self.process_name.ljust(max_process_width)}{Color('reset')}"
-        prefix_level        = f"{level_color}{level.value.ljust(LoggingLevel.max_width())}{Color('reset')}"
+        prefix_level        = f"{level_color}{level.value.ljust(LogLevel.max_width())}{Color('reset')}"
         prefix_timestamp    = f"{Color('gray')}{' ' * len(timestamp) if timestamp == last_timestamp else timestamp}{Color('reset')}"
         prefix              = f"{prefix_timestamp + ' ' if self.show_timestamp else ''}{prefix_process_name + ' ' if self.show_process_name else ''}{prefix_level + ' ' if self.show_level else ''}"
 

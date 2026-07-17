@@ -1,7 +1,7 @@
 import time
 
 from .text import Text
-from .logging import Logging, LoggingLevel
+from .logger import Logger, LogLevel
 from .progressbar import ProgressBar
 
 def demo_color():
@@ -26,8 +26,8 @@ def demo_text():
 
 def demo_logging():
     print("\n── Logging ──")
-    main = Logging("Main", primary_color="cyan",  display_level=LoggingLevel.DEBUG)
-    sub  = Logging("Sub",  primary_color="green", display_level=LoggingLevel.DEBUG)
+    main = Logger("Main", primary_color="cyan",  display_level=LogLevel.DEBUG)
+    sub  = Logger("Sub",  primary_color="green", display_level=LogLevel.DEBUG)
 
     main.info("Main #0")
     time.sleep(1)

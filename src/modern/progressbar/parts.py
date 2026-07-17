@@ -39,7 +39,7 @@ class MessagePart(main.ProgressBarPart):
         return bar.message
 
 class ETABackend:
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         raise NotImplementedError
 
     def estimate(self, current: int, total: int) -> Optional[float]:
@@ -55,7 +55,7 @@ class InstantaneousRateETABackend(ETABackend):
         self.previous: Optional[RateSample] = None
         self.rate: Optional[float] = None
 
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         sample = RateSample(time, current)
         if self.previous is not None:
             dt = sample.time - self.previous.time
@@ -74,7 +74,7 @@ class EMAETABackend(ETABackend):
         self.previous: Optional[RateSample] = None
         self.rate: Optional[float] = None
 
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         sample = RateSample(time, current)
         if self.previous is not None:
             dt = sample.time - self.previous.time
@@ -94,7 +94,7 @@ class LinearRegressionETABackend(ETABackend):
         self.outlier_threshold = outlier_threshold
         self.samples: List[RateSample] = []
 
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         if self.samples and self.samples[-1].time == time:
             return
         self.samples.append(RateSample(time, current))
@@ -158,7 +158,7 @@ class HoltLinearETABackend(ETABackend):
         self.trend: Optional[float] = None
         self.previous_time: Optional[float] = None
 
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         if self.level is None:
             self.level = float(current)
             self.trend = 0.0
@@ -191,7 +191,7 @@ class KalmanFilterETABackend(ETABackend):
         self.cross_variance = 0.0
         self.velocity_variance = 1.0
 
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         if self.position is None or not math.isfinite(self.position) or not math.isfinite(self.velocity):
             self.position = float(current)
             self.velocity = 0.0
@@ -242,9 +242,9 @@ class EnsembleETABackend(ETABackend):
     def __init__(self, backends: Optional[List[ETABackend]] = None):
         self.backends = backends or [LinearRegressionETABackend(), EMAETABackend(), HoltLinearETABackend(), KalmanFilterETABackend()]
 
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         for backend in self.backends:
-            backend.add(time, current)
+            backend.update(time, current)
 
     def estimate(self, current: int, total: int) -> Optional[float]:
         estimates = sorted(estimate for backend in self.backends if (estimate := backend.estimate(current, total)) is not None and math.isfinite(estimate))
@@ -262,7 +262,7 @@ class AutoETABackend(ETABackend):
         self.errors = [0.0] * len(self.backends)
         self.previous: Optional[RateSample] = None
 
-    def add(self, time: float, current: int):
+    def update(self, time: float, current: int):
         if self.previous is not None:
             dt = time - self.previous.time
             if dt > 0:
@@ -271,7 +271,7 @@ class AutoETABackend(ETABackend):
                     if predicted is not None:
                         self.errors[index] += abs(predicted - dt)
         for backend in self.backends:
-            backend.add(time, current)
+            backend.update(time, current)
         self.previous = RateSample(time, current)
 
     def estimate(self, current: int, total: int) -> Optional[float]:
@@ -286,8 +286,6 @@ class ETAPart(main.ProgressBarPart):
         self.backend = backend or AutoETABackend()
 
     def render(self, bar: "ProgressBar") -> str:
-        self.backend.add(time.monotonic(), bar.current)
-
         if bar.completed or bar.current <= 0:
             return ""
 
@@ -296,6 +294,9 @@ class ETAPart(main.ProgressBarPart):
             return ""
 
         return str(bar.secondary_color) + ETAPart.format(eta) + str(Color("reset"))
+
+    def on_update(self, bar: "ProgressBar"):
+        self.backend.update(time.monotonic(), bar.current)
 
     @staticmethod
     def format(seconds: float) -> str:
