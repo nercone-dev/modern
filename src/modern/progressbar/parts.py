@@ -38,6 +38,17 @@ class MessagePart(main.ProgressBarPart):
     def render(self, bar: "ProgressBar") -> str:
         return bar.message
 
+class RateSample:
+    def __init__(self, time: float, current: int):
+        self.time = time
+        self.current = current
+
+class ETAPrediction:
+    def __init__(self, time: float, target: int, estimates: List[Optional[float]]):
+        self.time = time
+        self.target = target
+        self.estimates = estimates
+
 class ETABackend:
     def update(self, time: float, current: int):
         raise NotImplementedError
@@ -50,11 +61,6 @@ class ETABackend:
         if rate is None or not math.isfinite(rate) or rate <= 0:
             return None
         return max(0.0, (total - current) / rate)
-
-class RateSample:
-    def __init__(self, time: float, current: int):
-        self.time = time
-        self.current = current
 
 class InstantaneousRateETABackend(ETABackend):
     def __init__(self, minimum_interval: float = 0.05):
@@ -282,6 +288,9 @@ class EnsembleETABackend(ETABackend):
     def estimate(self, current: int, total: int) -> Optional[float]:
         return EnsembleETABackend.combined([backend.estimate(current, total) for backend in self.backends], self.quantile)
 
+    def rate(self) -> Optional[float]:
+        return EnsembleETABackend.combined([backend.rate() for backend in self.backends], self.quantile)
+
     @staticmethod
     def combined(estimates: List[Optional[float]], quantile: float = 0.5) -> Optional[float]:
         values = sorted(estimate for estimate in estimates if estimate is not None and math.isfinite(estimate))
@@ -293,12 +302,6 @@ class EnsembleETABackend(ETABackend):
         upper = min(lower + 1, len(values) - 1)
         return values[lower] * (1 - (position - lower)) + values[upper] * (position - lower)
 
-class Prediction:
-    def __init__(self, time: float, target: int, estimates: List[Optional[float]]):
-        self.time = time
-        self.target = target
-        self.estimates = estimates
-
 class AutoETABackend(ETABackend):
     def __init__(self, backends: Optional[List[ETABackend]] = None, horizon: float = 5.0, patience: float = 4.0, decay: float = 0.9, hysteresis: float = 0.25):
         self.backends = backends or [InstantaneousRateETABackend(), EMAETABackend(), LinearRegressionETABackend(), HoltLinearETABackend(), KalmanFilterETABackend()]
@@ -308,7 +311,7 @@ class AutoETABackend(ETABackend):
         self.hysteresis = hysteresis
         self.errors = [0.0] * len(self.backends)
         self.counts = [0.0] * len(self.backends)
-        self.pending: Optional[Prediction] = None
+        self.pending: Optional[ETAPrediction] = None
         self.leader: Optional[int] = None
 
     def target(self, current: int) -> Optional[int]:
@@ -354,7 +357,7 @@ class AutoETABackend(ETABackend):
         if self.pending is None:
             target = self.target(current)
             if target is not None:
-                self.pending = Prediction(time, target, [backend.estimate(current, target) for backend in self.backends])
+                self.pending = ETAPrediction(time, target, [backend.estimate(current, target) for backend in self.backends])
 
         self.elect()
 
@@ -364,6 +367,13 @@ class AutoETABackend(ETABackend):
             if estimate is not None and math.isfinite(estimate):
                 return estimate
         return EnsembleETABackend.combined([backend.estimate(current, total) for backend in self.backends])
+
+    def rate(self) -> Optional[float]:
+        if self.leader is not None:
+            rate = self.backends[self.leader].rate()
+            if rate is not None and math.isfinite(rate):
+                return rate
+        return EnsembleETABackend.combined([backend.rate() for backend in self.backends])
 
 class ETAPart(main.ProgressBarPart):
     def __init__(self, backend: Optional[ETABackend] = None):
@@ -407,3 +417,29 @@ class ETAPart(main.ProgressBarPart):
             return f"{hours}:{minutes:02}:{seconds:02}"
         else:
             return f"{minutes:02}:{seconds:02}"
+
+class SpeedPart(main.ProgressBarPart):
+    def __init__(self, backend: Optional[ETABackend] = None, unit: str = "it"):
+        self.backend = backend or AutoETABackend()
+        self.unit = unit
+
+    def text(self, bar: "ProgressBar") -> str:
+        if bar.completed or bar.current <= 0:
+            return ""
+
+        rate = self.backend.rate()
+        if rate is None or not math.isfinite(rate) or rate <= 0:
+            return ""
+
+        return f"{rate:.2f}{self.unit}/s"
+
+    def render(self, bar: "ProgressBar") -> str:
+        text = self.text(bar)
+        if not text:
+            return ""
+
+        width = max((len(other.text(other_bar)) for other_bar in main.progress_bars for other in other_bar.prefix + other_bar.suffix if type(other) is SpeedPart), default=0)
+        return str(bar.secondary_color) + text.rjust(width) + str(Color("reset"))
+
+    def on_update(self, bar: "ProgressBar"):
+        self.backend.update(time.monotonic(), bar.current)

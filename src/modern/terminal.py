@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 import threading
+import time
 from typing import Dict, Iterable, List, Optional, TextIO
 
 lock = threading.RLock()
@@ -11,6 +12,10 @@ heights: Dict["TerminalRegion", int] = {}
 
 proxy: Optional["StdoutProxy"] = None
 stdout: Optional[TextIO] = None
+
+render_interval = 0.03
+render_pending = threading.Event()
+render_thread: Optional[threading.Thread] = None
 
 class TerminalRegion:
     def render(self) -> str:
@@ -175,3 +180,22 @@ class Terminal:
             Terminal.stream().flush()
         sys.stdout = Terminal.stream()
         proxy = None
+
+    @staticmethod
+    def schedule_redraw():
+        global render_thread
+        with lock:
+            render_pending.set()
+            if render_thread is None:
+                render_thread = threading.Thread(target=Terminal.render_loop, daemon=True)
+                render_thread.start()
+
+    @staticmethod
+    def render_loop():
+        while True:
+            render_pending.wait()
+            time.sleep(render_interval)
+            with lock:
+                render_pending.clear()
+                if regions:
+                    Terminal.redraw()

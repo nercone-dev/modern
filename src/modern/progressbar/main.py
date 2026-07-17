@@ -62,7 +62,7 @@ class ProgressBar(TerminalRegion):
             self.current = self.total
         for part in self.prefix + self.suffix:
             part.on_update(self)
-        Terminal.redraw()
+        Terminal.schedule_redraw()
 
     def finish(self):
         if self.frozen:

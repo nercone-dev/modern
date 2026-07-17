@@ -2,7 +2,7 @@ import time
 
 from .text import Text
 from .logger import Logger, LogLevel
-from .progressbar import ProgressBar
+from .progressbar import ProgressBar, NamePart, PercentagePart, ProgressPart, SpeedPart, ETAPart, MessagePart
 
 def demo_color():
     print("── Color ──")
@@ -58,9 +58,9 @@ def demo_progressbar():
             bar.update(1)
         bar.finish()
 
-    bar0 = ProgressBar("Download", total=30, primary_color="blue")
-    bar1 = ProgressBar("Extract",  total=20, primary_color="cyan")
-    bar2 = ProgressBar("Install",  total=15, primary_color="green")
+    bar0 = ProgressBar("Download", total=1000, primary_color="blue", suffix=[NamePart(), PercentagePart(), ProgressPart(), SpeedPart(), ETAPart(), MessagePart()])
+    bar1 = ProgressBar("Extract",  total=20, primary_color="cyan", suffix=[NamePart(), PercentagePart(), ProgressPart(), MessagePart()])
+    bar2 = ProgressBar("Install",  total=15, primary_color="green", suffix=[NamePart(), PercentagePart(), MessagePart()])
 
     run(bar0, 50)
     run(bar1, 50)
