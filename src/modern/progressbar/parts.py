@@ -370,7 +370,7 @@ class ETAPart(main.ProgressBarPart):
         self.backend = backend or AutoETABackend()
         self.latest: Optional[RateSample] = None
 
-    def render(self, bar: "ProgressBar") -> str:
+    def text(self, bar: "ProgressBar") -> str:
         if bar.completed or bar.current <= 0:
             return ""
 
@@ -381,7 +381,15 @@ class ETAPart(main.ProgressBarPart):
         if self.latest is not None:
             eta = max(eta, time.monotonic() - self.latest.time)
 
-        return str(bar.secondary_color) + ETAPart.format(eta) + str(Color("reset"))
+        return ETAPart.format(eta)
+
+    def render(self, bar: "ProgressBar") -> str:
+        text = self.text(bar)
+        if not text:
+            return ""
+
+        width = max((len(other.text(other_bar)) for other_bar in main.progress_bars for other in other_bar.prefix + other_bar.suffix if type(other) is ETAPart), default=0)
+        return str(bar.secondary_color) + text.rjust(width) + str(Color("reset"))
 
     def on_update(self, bar: "ProgressBar"):
         now = time.monotonic()
@@ -393,4 +401,9 @@ class ETAPart(main.ProgressBarPart):
     def format(seconds: float) -> str:
         seconds = max(0, round(seconds))
         minutes, seconds = divmod(seconds, 60)
-        return f"{minutes:02}:{seconds:02}"
+        hours, minutes = divmod(minutes, 60)
+
+        if hours:
+            return f"{hours}:{minutes:02}:{seconds:02}"
+        else:
+            return f"{minutes:02}:{seconds:02}"
