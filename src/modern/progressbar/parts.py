@@ -42,8 +42,14 @@ class ETABackend:
     def update(self, time: float, current: int):
         raise NotImplementedError
 
-    def estimate(self, current: int, total: int) -> Optional[float]:
+    def rate(self) -> Optional[float]:
         raise NotImplementedError
+
+    def estimate(self, current: int, total: int) -> Optional[float]:
+        rate = self.rate()
+        if rate is None or not math.isfinite(rate) or rate <= 0:
+            return None
+        return max(0.0, (total - current) / rate)
 
 class RateSample:
     def __init__(self, time: float, current: int):
@@ -51,171 +57,199 @@ class RateSample:
         self.current = current
 
 class InstantaneousRateETABackend(ETABackend):
-    def __init__(self):
-        self.previous: Optional[RateSample] = None
-        self.rate: Optional[float] = None
+    def __init__(self, minimum_interval: float = 0.05):
+        self.minimum_interval = minimum_interval
+        self.anchor: Optional[RateSample] = None
+        self.measured: Optional[float] = None
 
     def update(self, time: float, current: int):
         sample = RateSample(time, current)
-        if self.previous is not None:
-            dt = sample.time - self.previous.time
-            if dt > 0:
-                self.rate = (sample.current - self.previous.current) / dt
-        self.previous = sample
+        if self.anchor is None:
+            self.anchor = sample
+            return
 
-    def estimate(self, current: int, total: int) -> Optional[float]:
-        if not self.rate or not math.isfinite(self.rate) or self.rate <= 0:
-            return None
-        return (total - current) / self.rate
+        interval = sample.time - self.anchor.time
+        if interval <= 0 or interval < self.minimum_interval:
+            return
+
+        self.measured = (sample.current - self.anchor.current) / interval
+        self.anchor = sample
+
+    def rate(self) -> Optional[float]:
+        return self.measured
 
 class EMAETABackend(ETABackend):
-    def __init__(self, smoothing: float = 0.3):
-        self.smoothing = smoothing
-        self.previous: Optional[RateSample] = None
-        self.rate: Optional[float] = None
+    def __init__(self, half_life: float = 2.0, minimum_interval: float = 0.05):
+        self.half_life = half_life
+        self.minimum_interval = minimum_interval
+        self.anchor: Optional[RateSample] = None
+        self.smoothed: Optional[float] = None
 
     def update(self, time: float, current: int):
         sample = RateSample(time, current)
-        if self.previous is not None:
-            dt = sample.time - self.previous.time
-            if dt > 0:
-                instant_rate = (sample.current - self.previous.current) / dt
-                self.rate = instant_rate if self.rate is None else self.smoothing * instant_rate + (1 - self.smoothing) * self.rate
-        self.previous = sample
+        if self.anchor is None:
+            self.anchor = sample
+            return
 
-    def estimate(self, current: int, total: int) -> Optional[float]:
-        if not self.rate or not math.isfinite(self.rate) or self.rate <= 0:
-            return None
-        return (total - current) / self.rate
+        interval = sample.time - self.anchor.time
+        if interval <= 0 or interval < self.minimum_interval:
+            return
+
+        measured = (sample.current - self.anchor.current) / interval
+        self.anchor = sample
+
+        if self.smoothed is None or self.half_life <= 0:
+            self.smoothed = measured
+            return
+
+        weight = 1 - 0.5 ** (interval / self.half_life)
+        self.smoothed = weight * measured + (1 - weight) * self.smoothed
+
+    def rate(self) -> Optional[float]:
+        return self.smoothed
 
 class LinearRegressionETABackend(ETABackend):
-    def __init__(self, window_size: int = 20, outlier_threshold: float = 3.0):
-        self.window_size = window_size
-        self.outlier_threshold = outlier_threshold
+    def __init__(self, window: float = 2.0, minimum_samples: int = 16, maximum_samples: int = 128, minimum_interval: float = 0.05):
+        self.window = window
+        self.minimum_samples = minimum_samples
+        self.maximum_samples = maximum_samples
+        self.minimum_interval = minimum_interval
         self.samples: List[RateSample] = []
 
     def update(self, time: float, current: int):
-        if self.samples and self.samples[-1].time == time:
-            return
+        if self.samples:
+            interval = time - self.samples[-1].time
+            if interval <= 0 or interval < self.minimum_interval:
+                return
+
         self.samples.append(RateSample(time, current))
-        if len(self.samples) > self.window_size:
+
+        horizon = time - self.window
+        while len(self.samples) > self.minimum_samples and self.samples[0].time < horizon:
+            self.samples.pop(0)
+        while len(self.samples) > self.maximum_samples:
             self.samples.pop(0)
 
-    def outliers_removed(self) -> List[RateSample]:
-        if len(self.samples) < 3:
-            return self.samples
-
-        rates = []
-        for previous, sample in zip(self.samples, self.samples[1:]):
-            dt = sample.time - previous.time
-            if dt > 0:
-                rates.append((sample.current - previous.current) / dt)
-
-        if not rates:
-            return self.samples
-
-        rates.sort()
-        median_rate = rates[len(rates) // 2]
-        deviations = sorted(abs(rate - median_rate) for rate in rates)
-        median_deviation = deviations[len(deviations) // 2] or 1e-9
-
-        filtered = [self.samples[0]]
-        for previous, sample in zip(self.samples, self.samples[1:]):
-            dt = sample.time - previous.time
-            if dt <= 0:
-                continue
-            rate = (sample.current - previous.current) / dt
-            if abs(rate - median_rate) <= self.outlier_threshold * median_deviation:
-                filtered.append(sample)
-        return filtered
-
     def rate(self) -> Optional[float]:
-        samples = self.outliers_removed()
-        if len(samples) < 2:
+        if len(self.samples) < 2:
             return None
 
-        mean_time = sum(sample.time for sample in samples) / len(samples)
-        mean_current = sum(sample.current for sample in samples) / len(samples)
+        mean_time = sum(sample.time for sample in self.samples) / len(self.samples)
+        mean_current = sum(sample.current for sample in self.samples) / len(self.samples)
 
-        covariance = sum((sample.time - mean_time) * (sample.current - mean_current) for sample in samples)
-        variance = sum((sample.time - mean_time) ** 2 for sample in samples)
+        covariance = sum((sample.time - mean_time) * (sample.current - mean_current) for sample in self.samples)
+        variance = sum((sample.time - mean_time) ** 2 for sample in self.samples)
         if variance == 0:
             return None
 
         return covariance / variance
 
-    def estimate(self, current: int, total: int) -> Optional[float]:
-        rate = self.rate()
-        if not rate or not math.isfinite(rate) or rate <= 0:
-            return None
-        return (total - current) / rate
-
 class HoltLinearETABackend(ETABackend):
-    def __init__(self, level_smoothing: float = 0.3, trend_smoothing: float = 0.1):
-        self.level_smoothing = level_smoothing
-        self.trend_smoothing = trend_smoothing
+    def __init__(self, level_half_life: float = 0.01, trend_half_life: float = 1.0, minimum_interval: float = 0.05):
+        self.level_half_life = level_half_life
+        self.trend_half_life = trend_half_life
+        self.minimum_interval = minimum_interval
         self.level: Optional[float] = None
         self.trend: Optional[float] = None
+        self.started: Optional[float] = None
         self.previous_time: Optional[float] = None
 
     def update(self, time: float, current: int):
         if self.level is None:
             self.level = float(current)
             self.trend = 0.0
+            self.started = time
             self.previous_time = time
             return
 
-        dt = time - self.previous_time
-        if dt <= 0:
+        interval = time - self.previous_time
+        if interval <= 0 or interval < self.minimum_interval:
             return
         self.previous_time = time
 
-        previous_level = self.level
-        forecast = self.level + self.trend * dt
-        self.level = self.level_smoothing * current + (1 - self.level_smoothing) * forecast
-        self.trend = self.trend_smoothing * ((self.level - previous_level) / dt) + (1 - self.trend_smoothing) * self.trend
+        level_weight = 1 - 0.5 ** (interval / self.level_half_life) if self.level_half_life > 0 else 1.0
+        trend_weight = 1 - 0.5 ** (interval / self.trend_half_life) if self.trend_half_life > 0 else 1.0
 
-    def estimate(self, current: int, total: int) -> Optional[float]:
-        if self.level is None or not self.trend or not math.isfinite(self.trend) or self.trend <= 0:
+        previous_level = self.level
+        forecast = self.level + self.trend * interval
+        self.level = level_weight * current + (1 - level_weight) * forecast
+        self.trend = trend_weight * ((self.level - previous_level) / interval) + (1 - trend_weight) * self.trend
+
+    def rate(self) -> Optional[float]:
+        if self.trend is None or self.started is None:
             return None
-        return (total - self.level) / self.trend
+        if self.trend_half_life <= 0:
+            return self.trend
+
+        settled = 1 - 0.5 ** ((self.previous_time - self.started) / self.trend_half_life)
+        if settled <= 0:
+            return None
+        return self.trend / settled
 
 class KalmanFilterETABackend(ETABackend):
-    def __init__(self, process_variance: float = 1e-2, measurement_variance: float = 1.0):
-        self.process_variance = process_variance
-        self.measurement_variance = measurement_variance
+    def __init__(self, drift: float = 0.15, jitter: float = 0.5, minimum_interval: float = 0.05):
+        self.drift = drift
+        self.jitter = jitter
+        self.minimum_interval = minimum_interval
+        self.first: Optional[RateSample] = None
         self.position: Optional[float] = None
         self.velocity = 0.0
         self.previous_time: Optional[float] = None
-        self.position_variance = 1.0
+        self.position_variance = 0.0
         self.cross_variance = 0.0
-        self.velocity_variance = 1.0
+        self.velocity_variance = 0.0
+
+    def reset(self, time: float, current: int):
+        self.first = RateSample(time, current)
+        self.position = float(current)
+        self.velocity = 0.0
+        self.previous_time = time
+        self.position_variance = 0.0
+        self.cross_variance = 0.0
+        self.velocity_variance = 0.0
+
+    def seed(self, current: int):
+        elapsed = self.previous_time - self.first.time
+        if elapsed <= 0:
+            return
+
+        velocity = (current - self.first.current) / elapsed
+        if velocity <= 0:
+            return
+
+        self.position = float(current)
+        self.velocity = velocity
+        self.position_variance = (self.jitter * velocity) ** 2
+        self.cross_variance = 0.0
+        self.velocity_variance = (self.drift * velocity) ** 2
 
     def update(self, time: float, current: int):
         if self.position is None or not math.isfinite(self.position) or not math.isfinite(self.velocity):
-            self.position = float(current)
-            self.velocity = 0.0
-            self.position_variance = 1.0
-            self.cross_variance = 0.0
-            self.velocity_variance = 1.0
-            self.previous_time = time
+            self.reset(time, current)
             return
 
-        dt = time - self.previous_time
-        if dt <= 0:
+        interval = time - self.previous_time
+        if interval <= 0 or interval < self.minimum_interval:
             return
         self.previous_time = time
 
-        predicted_position = self.position + self.velocity * dt
+        if self.velocity <= 0:
+            self.seed(current)
+            return
+
+        process_variance = (self.drift * self.velocity) ** 2
+        measurement_variance = (self.jitter * self.velocity) ** 2
+
+        predicted_position = self.position + self.velocity * interval
         predicted_velocity = self.velocity
 
-        predicted_position_variance = self.position_variance + 2 * dt * self.cross_variance + dt * dt * self.velocity_variance + self.process_variance
-        predicted_cross_variance = self.cross_variance + dt * self.velocity_variance
-        predicted_velocity_variance = self.velocity_variance + self.process_variance
+        predicted_position_variance = self.position_variance + 2 * interval * self.cross_variance + interval * interval * self.velocity_variance + process_variance * interval ** 3 / 3
+        predicted_cross_variance = self.cross_variance + interval * self.velocity_variance + process_variance * interval ** 2 / 2
+        predicted_velocity_variance = self.velocity_variance + process_variance * interval
 
         innovation = current - predicted_position
-        innovation_variance = predicted_position_variance + self.measurement_variance
-        if innovation_variance == 0:
+        innovation_variance = predicted_position_variance + measurement_variance
+        if innovation_variance <= 0:
             self.position = predicted_position
             self.velocity = predicted_velocity
             self.position_variance = predicted_position_variance
@@ -233,57 +267,108 @@ class KalmanFilterETABackend(ETABackend):
         self.cross_variance = (1 - position_gain) * predicted_cross_variance
         self.velocity_variance = predicted_velocity_variance - velocity_gain * predicted_cross_variance
 
-    def estimate(self, current: int, total: int) -> Optional[float]:
-        if self.position is None or not math.isfinite(self.velocity) or self.velocity <= 0:
-            return None
-        return (total - self.position) / self.velocity
+    def rate(self) -> Optional[float]:
+        return self.velocity
 
 class EnsembleETABackend(ETABackend):
-    def __init__(self, backends: Optional[List[ETABackend]] = None):
+    def __init__(self, backends: Optional[List[ETABackend]] = None, quantile: float = 0.5):
         self.backends = backends or [LinearRegressionETABackend(), EMAETABackend(), HoltLinearETABackend(), KalmanFilterETABackend()]
+        self.quantile = quantile
 
     def update(self, time: float, current: int):
         for backend in self.backends:
             backend.update(time, current)
 
     def estimate(self, current: int, total: int) -> Optional[float]:
-        estimates = sorted(estimate for backend in self.backends if (estimate := backend.estimate(current, total)) is not None and math.isfinite(estimate))
-        if not estimates:
+        return EnsembleETABackend.combined([backend.estimate(current, total) for backend in self.backends], self.quantile)
+
+    @staticmethod
+    def combined(estimates: List[Optional[float]], quantile: float = 0.5) -> Optional[float]:
+        values = sorted(estimate for estimate in estimates if estimate is not None and math.isfinite(estimate))
+        if not values:
             return None
 
-        middle = len(estimates) // 2
-        if len(estimates) % 2 == 0:
-            return (estimates[middle - 1] + estimates[middle]) / 2
-        return estimates[middle]
+        position = min(max(quantile, 0.0), 1.0) * (len(values) - 1)
+        lower = math.floor(position)
+        upper = min(lower + 1, len(values) - 1)
+        return values[lower] * (1 - (position - lower)) + values[upper] * (position - lower)
+
+class Prediction:
+    def __init__(self, time: float, target: int, estimates: List[Optional[float]]):
+        self.time = time
+        self.target = target
+        self.estimates = estimates
 
 class AutoETABackend(ETABackend):
-    def __init__(self, backends: Optional[List[ETABackend]] = None):
+    def __init__(self, backends: Optional[List[ETABackend]] = None, horizon: float = 5.0, patience: float = 4.0, decay: float = 0.9, hysteresis: float = 0.25):
         self.backends = backends or [InstantaneousRateETABackend(), EMAETABackend(), LinearRegressionETABackend(), HoltLinearETABackend(), KalmanFilterETABackend()]
+        self.horizon = horizon
+        self.patience = patience
+        self.decay = decay
+        self.hysteresis = hysteresis
         self.errors = [0.0] * len(self.backends)
-        self.previous: Optional[RateSample] = None
+        self.counts = [0.0] * len(self.backends)
+        self.pending: Optional[Prediction] = None
+        self.leader: Optional[int] = None
+
+    def target(self, current: int) -> Optional[int]:
+        pace = EnsembleETABackend.combined([backend.estimate(current, current + 1) for backend in self.backends])
+        if pace is None or pace <= 0:
+            return None
+        return current + max(1, round(self.horizon / pace))
+
+    def score(self, time: float, current: int):
+        if self.pending is None:
+            return
+
+        if current < self.pending.target:
+            if time - self.pending.time > self.horizon * self.patience:
+                self.pending = None
+            return
+
+        elapsed = time - self.pending.time
+        for index, estimate in enumerate(self.pending.estimates):
+            if estimate is None:
+                continue
+            self.errors[index] = self.decay * self.errors[index] + abs(estimate - elapsed)
+            self.counts[index] = self.decay * self.counts[index] + 1
+        self.pending = None
+
+    def elect(self):
+        scored = [index for index in range(len(self.backends)) if self.counts[index] > 0]
+        if not scored:
+            return
+
+        best = min(scored, key=lambda index: self.errors[index] / self.counts[index])
+        if self.leader is None or self.leader not in scored:
+            self.leader = best
+        elif best != self.leader and self.errors[best] / self.counts[best] < (self.errors[self.leader] / self.counts[self.leader]) * (1 - self.hysteresis):
+            self.leader = best
 
     def update(self, time: float, current: int):
-        if self.previous is not None:
-            dt = time - self.previous.time
-            if dt > 0:
-                for index, backend in enumerate(self.backends):
-                    predicted = backend.estimate(self.previous.current, current)
-                    if predicted is not None:
-                        self.errors[index] += abs(predicted - dt)
+        self.score(time, current)
+
         for backend in self.backends:
             backend.update(time, current)
-        self.previous = RateSample(time, current)
+
+        if self.pending is None:
+            target = self.target(current)
+            if target is not None:
+                self.pending = Prediction(time, target, [backend.estimate(current, target) for backend in self.backends])
+
+        self.elect()
 
     def estimate(self, current: int, total: int) -> Optional[float]:
-        for index in sorted(range(len(self.backends)), key=lambda index: self.errors[index]):
-            estimate = self.backends[index].estimate(current, total)
+        if self.leader is not None:
+            estimate = self.backends[self.leader].estimate(current, total)
             if estimate is not None and math.isfinite(estimate):
                 return estimate
-        return None
+        return EnsembleETABackend.combined([backend.estimate(current, total) for backend in self.backends])
 
 class ETAPart(main.ProgressBarPart):
     def __init__(self, backend: Optional[ETABackend] = None):
         self.backend = backend or AutoETABackend()
+        self.latest: Optional[RateSample] = None
 
     def render(self, bar: "ProgressBar") -> str:
         if bar.completed or bar.current <= 0:
@@ -293,10 +378,16 @@ class ETAPart(main.ProgressBarPart):
         if eta is None or not math.isfinite(eta):
             return ""
 
+        if self.latest is not None:
+            eta = max(eta, time.monotonic() - self.latest.time)
+
         return str(bar.secondary_color) + ETAPart.format(eta) + str(Color("reset"))
 
     def on_update(self, bar: "ProgressBar"):
-        self.backend.update(time.monotonic(), bar.current)
+        now = time.monotonic()
+        if self.latest is None or bar.current != self.latest.current:
+            self.latest = RateSample(now, bar.current)
+        self.backend.update(now, bar.current)
 
     @staticmethod
     def format(seconds: float) -> str:
